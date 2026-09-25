@@ -1,4 +1,4 @@
 # Templates withdrawn from the catalog. Every Flow installation hides a listed
 # template and refuses new installs of it; projects already installed from it
-# are not touched. Entries: - { slug: <slug>, reason: <shown on the template page> }
+# are not touched. Entries: - { template: <namespace>/<slug>, reason: <shown on the template page> }
 []

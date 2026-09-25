@@ -1,0 +1,10 @@
+# Publishers. A template lives at templates/<name>/<slug>/ and its catalog id is
+# <name>/<slug>. Only the owners (GitHub logins) of a namespace may change its
+# templates — CI checks the author of every pull request. Register a new
+# namespace by adding an entry in the pull request that publishes your first
+# template; the maintainers approve it. `verified` is set by the maintainers only.
+- name: aixle
+  display_name: Aixle
+  url: https://github.com/AixleHQ
+  verified: true
+  owners: [artempartos]
