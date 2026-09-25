@@ -1,0 +1,18 @@
+format_version: 1
+slug: sentry-remote-mcp
+version: 1
+name: Sentry (remote MCP)
+summary: Sentry's hosted MCP server, which the public MCP registry does not list.
+  Sign-in happens on first use.
+categories:
+- observability
+authors:
+- github: AixleHQ
+mcp_servers:
+- key: sentry
+  custom:
+    name: Sentry
+    description: Sentry issues, events and projects over MCP.
+    transport: http
+    url: https://mcp.sentry.dev/mcp
+    auth_type: oauth

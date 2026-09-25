@@ -1,0 +1,38 @@
+format_version: 1
+slug: dev-team-board
+version: 1
+name: Dev Team board
+summary: 'A board for a development team: tech design, implementation, review and
+  QA, with column purposes agents can read.'
+categories:
+- boards
+authors:
+- github: AixleHQ
+board:
+  name: Dev Team
+  columns:
+  - key: backlog
+    name: Backlog
+    purpose: Tasks ready for development. Pick the highest priority item.
+  - key: tech_design
+    name: Tech Design
+    purpose: Technical design phase. Agent should analyze requirements, propose architecture,
+      and produce a tech design document as a comment with tag 'tech_design'.
+  - key: implementation
+    name: Implementation
+    purpose: Active development. Agent implements the solution based on tech design,
+      writes code and tests.
+  - key: code_review
+    name: Code Review
+    purpose: Code review phase. Agent reviews implementation for quality, correctness,
+      and adherence to standards. Produces review as comment with tag 'code_review'.
+  - key: qa
+    name: QA
+    purpose: Quality assurance phase. Agent runs test suites, validates acceptance
+      criteria, produces QA report as comment with tag 'qa_report'.
+  - key: ready_for_release
+    name: Ready for Release
+    purpose: Task approved and waiting to be included in the next release.
+  - key: done
+    name: Done
+    purpose: Task completed and approved.

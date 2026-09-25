@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Validates this checkout with the same code every Flow installation runs when it
+# mirrors the catalog (Templates::RepositoryValidator in AixleHQ/flow). Needs Docker.
+#
+#   bin/validate                  validate the working tree
+#   bin/validate ../base-checkout also check that changed templates raised their version
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+image="${FLOW_IMAGE:-ghcr.io/aixlehq/flow-web:latest}"
+base_args=()
+if [[ $# -ge 1 ]]; then
+  base_args=(-v "$(cd "$1" && pwd):/base:ro" -e BASE=/base)
+fi
+
+# Production refuses to boot without its encryption keys. The validator encrypts
+# nothing and never opens the database, so throwaway values are enough.
+key_args=()
+for var in RAILS_SECRET_KEY_BASE CREDENTIALS_SECRET_KEY CONFIG_ITEMS_SECRET_KEY INTEGRATIONS_SECRET_KEY OAUTH_SECRET_KEY; do
+  key_args+=(-e "$var=validate-only-not-a-secret")
+done
+
+docker run --rm \
+  -v "$root:/catalog:ro" -e ROOT=/catalog ${base_args[@]+"${base_args[@]}"} \
+  -e RAILS_ENV=production -e AWS_EC2_METADATA_DISABLED=true "${key_args[@]}" \
+  "$image" bin/rails templates:validate

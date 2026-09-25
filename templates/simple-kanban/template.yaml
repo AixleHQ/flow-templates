@@ -1,0 +1,21 @@
+format_version: 1
+slug: simple-kanban
+version: 1
+name: Simple Kanban board
+summary: A three-column board for work in progress.
+categories:
+- boards
+authors:
+- github: AixleHQ
+board:
+  name: Simple Kanban
+  columns:
+  - key: backlog
+    name: Backlog
+    purpose: Tasks waiting to be started.
+  - key: in_progress
+    name: In Progress
+    purpose: Tasks currently being worked on.
+  - key: done
+    name: Done
+    purpose: Completed tasks.

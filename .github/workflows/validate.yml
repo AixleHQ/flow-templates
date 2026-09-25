@@ -1,0 +1,48 @@
+name: Validate templates
+
+# Every pull request comes from a fork and is untrusted. This workflow therefore
+# runs on `pull_request` (never `pull_request_target`), with a read-only token and
+# no secrets, and the validator only reads the files: it never runs a template's
+# commands or images.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the change
+        uses: actions/checkout@v5
+        with:
+          path: change
+          persist-credentials: false
+
+      - name: Check out the base branch
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+          persist-credentials: false
+
+      - name: Validate with Flow's own validator
+        run: |
+          if [ -d base ]; then change/bin/validate base; else change/bin/validate; fi
+
+      - name: Scan for secrets
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1
+        with:
+          args: dir change --redact --no-banner
+
+      - name: Check tool images resolve by digest
+        run: |
+          grep -rhoE '[^" ]+@sha256:[0-9a-f]{64}' change/templates || exit 0
+          for image in $(grep -rhoE '[^" ]+@sha256:[0-9a-f]{64}' change/templates | sort -u); do
+            docker manifest inspect "$image" > /dev/null || { echo "::error::$image does not resolve"; exit 1; }
+          done

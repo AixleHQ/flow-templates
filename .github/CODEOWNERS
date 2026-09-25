@@ -1,0 +1,5 @@
+# Changes to how templates are checked need a maintainer's explicit review.
+/.github/ @AixleHQ/maintainers
+/bin/     @AixleHQ/maintainers
+/schema/  @AixleHQ/maintainers
+*         @AixleHQ/maintainers

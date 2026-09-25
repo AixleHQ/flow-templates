@@ -1,0 +1,75 @@
+format_version: 1
+slug: full-sdlc-board
+version: 1
+name: Full SDLC board
+summary: A nineteen-column board covering design, tech design, development, QA, UAT
+  and release.
+categories:
+- boards
+authors:
+- github: AixleHQ
+board:
+  name: Full SDLC
+  columns:
+  - key: backlog
+    name: Backlog
+    purpose: Tasks in queue, not yet prioritized for current iteration.
+  - key: ready_for_design
+    name: Ready for Design
+    purpose: Task is prioritized and waiting for product/UX design phase.
+  - key: in_design
+    name: In Design
+    purpose: Product/UX design phase. Define user flows, wireframes, and requirements.
+  - key: design_review
+    name: Design Review
+    purpose: Design review phase. Validate UX decisions and requirements.
+  - key: ready_for_tech_design
+    name: Ready for Tech Design
+    purpose: Design approved, waiting for technical design to begin.
+  - key: in_tech_design
+    name: In Tech Design
+    purpose: Technical design phase. Agent analyzes requirements, proposes architecture,
+      produces tech design as comment with tag 'tech_design'.
+  - key: tech_design_review
+    name: Tech Design Review
+    purpose: Tech design review phase. Validate architecture decisions and technical
+      approach.
+  - key: ready_for_dev
+    name: Ready for Dev
+    purpose: Tech design approved, task is ready to be picked up for implementation.
+  - key: in_development
+    name: In Development
+    purpose: Active development. Agent implements the solution, writes code and tests
+      based on tech design.
+  - key: code_review
+    name: Code Review
+    purpose: Code review phase. Agent reviews implementation for quality and correctness.
+      Produces review as comment with tag 'code_review'.
+  - key: ready_for_qa
+    name: Ready for QA
+    purpose: Implementation reviewed and approved, waiting for QA.
+  - key: in_qa
+    name: In QA
+    purpose: Quality assurance phase. Agent runs test suites, validates acceptance
+      criteria, produces QA report as comment with tag 'qa_report'.
+  - key: qa_approved
+    name: QA Approved
+    purpose: QA passed, task is verified and ready for user acceptance testing.
+  - key: ready_for_uat
+    name: Ready for UAT
+    purpose: Task waiting for user acceptance testing.
+  - key: in_uat
+    name: In UAT
+    purpose: User acceptance testing in progress. Stakeholders validate the feature.
+  - key: uat_approved
+    name: UAT Approved
+    purpose: UAT passed, feature accepted by stakeholders.
+  - key: ready_for_release
+    name: Ready for Release
+    purpose: Task approved and waiting to be included in the next release.
+  - key: in_release
+    name: In Release
+    purpose: Deployment in progress. Code being released to production.
+  - key: done
+    name: Done
+    purpose: Task completed, released, and verified in production.
