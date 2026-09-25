@@ -1,6 +1,9 @@
 # Contributing a template
 
-1. **One template per pull request**, in `templates/<slug>/`.
+1. **One template per pull request**, in `templates/<namespace>/<slug>/`, under a
+   namespace you own. First time? Add your namespace to `namespaces.yaml` in the
+   same pull request (`name`, `display_name`, `owners: [<your GitHub login>]`);
+   leave `verified` out — the maintainers set it.
 2. **Run `bin/validate`** before pushing. CI runs the same check, plus a secret
    scan and a check that every tool image resolves by its digest.
 3. **Explain it.** `README.md` says what the template does and who it is for;

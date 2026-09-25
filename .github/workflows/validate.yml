@@ -31,7 +31,13 @@ jobs:
           path: base
           persist-credentials: false
 
+      # On a pull request the validator also checks that its author owns every
+      # namespace whose templates change. Organisation members and owners are
+      # the maintainers; author_association comes from the event, so no token.
       - name: Validate with Flow's own validator
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          AUTHOR_IS_MAINTAINER: ${{ contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association) }}
         run: |
           if [ -d base ]; then change/bin/validate base; else change/bin/validate; fi
 

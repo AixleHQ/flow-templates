@@ -4,6 +4,9 @@
 #
 #   bin/validate                  validate the working tree
 #   bin/validate ../base-checkout also check that changed templates raised their version
+#
+# AUTHOR=<github login> additionally checks that the author owns every namespace
+# whose templates changed; AUTHOR_IS_MAINTAINER=true skips that check.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 image="${FLOW_IMAGE:-ghcr.io/aixlehq/flow-web:latest}"
@@ -22,4 +25,5 @@ done
 docker run --rm \
   -v "$root:/catalog:ro" -e ROOT=/catalog ${base_args[@]+"${base_args[@]}"} \
   -e RAILS_ENV=production -e AWS_EC2_METADATA_DISABLED=true "${key_args[@]}" \
+  -e AUTHOR="${AUTHOR:-}" -e AUTHOR_IS_MAINTAINER="${AUTHOR_IS_MAINTAINER:-false}" \
   "$image" bin/rails templates:validate
