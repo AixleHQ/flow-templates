@@ -15,9 +15,10 @@ if [[ $# -ge 1 ]]; then
   base_args=(-v "$(cd "$1" && pwd):/base:ro" -e BASE=/base)
 fi
 
-# Production refuses to boot without its encryption keys. The validator encrypts
+# Production refuses to boot without its encryption keys and upload bucket
+# (config/initializers/required_env.rb). The validator encrypts nothing, uploads
 # nothing and never opens the database, so throwaway values are enough.
-key_args=()
+key_args=(-e AWS_S3_BUCKET=validate-only -e REGISTRATION_ENABLED=false)
 for var in RAILS_SECRET_KEY_BASE CREDENTIALS_SECRET_KEY CONFIG_ITEMS_SECRET_KEY INTEGRATIONS_SECRET_KEY OAUTH_SECRET_KEY; do
   key_args+=(-e "$var=validate-only-not-a-secret")
 done
