@@ -8,16 +8,17 @@ description: How to turn a verified security finding into a fix task card on the
 ## Creating a fix card (report step)
 
 Create one card per verified finding with `board_create_task` in the column
-**Fix Backlog**. Never create a card for FALSE_POSITIVE or EXCLUDED
-candidates.
+**Fix Backlog**. Never create a card for a FALSE_POSITIVE, EXCLUDED or
+MERGED candidate.
 
-Re-audits must not duplicate cards. Before creating one, run `board_list_tasks`
-on Fix Backlog, Fixing, Fix In Review, Done and Won't Fix. A finding already has
-a card when an existing card has the same CWE, file and symbol, whatever its
-SA number. In that case comment on the existing card instead of creating a new one.
+Re-audits must not duplicate cards. Before creating a card, run `board_list_tasks` on
+Fix Backlog, Fixing, Fix In Review, Done and Won't Fix. A finding already has a
+card when a card with the same CWE, file and symbol exists, whatever its SA
+number. In that case, comment on the existing card instead of creating a new one.
 
 - **title**: `[<SEVERITY>] <short title> (<CWE>)`, for example `[HIGH] Order lookup returns any user's order (CWE-639)`
-- **priority**: critical→`urgent`, high→`high`, medium→`medium`, low→`low`
+- **priority**: set it to the severity, one to one: critical→`critical`,
+  high→`high`, medium→`medium`, low→`low`.
 - **tags**: `security`, `sev:<severity>`, `<class>`, `audit:<audit card id>`
 - **assignee**: the audit card's assignee. A fix run is billed to the card's
   assignee, and a card without one cannot start the fix workflow.
@@ -26,6 +27,7 @@ SA number. In that case comment on the existing card instead of creating a new o
 ```markdown
 ## Finding
 <finding_id> from audit #<audit card id>. <2–3 sentence description of the bug and impact.>
+Scanner evidence: <related SCAN ids and tools, or "none">
 
 ## Where
 - `file:line` — symbol (one line per location)
@@ -53,7 +55,8 @@ framework mechanism when one exists.>
 ```
 
 Secret values never go on a card. For a leaked secret, the fix section says
-"rotate the credential" first. Removing it from git history does not un-leak it.
+"rotate the credential" first, because removing it from git history does not
+un-leak it.
 
 Then add a comment on the **audit** card listing every fix card created (id + title).
 

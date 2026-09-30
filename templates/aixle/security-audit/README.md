@@ -38,7 +38,9 @@ Audit Queue → Auditing ──────────────────�
 4. **The Skeptic Verifier** re-derives every candidate from the code, looks for
    the guard the hunter missed, and applies a fixed rubric: confidence of at least
    0.8, plus hard exclusions such as DoS, theoretical races and missing hardening.
-   It also searches for variants of each confirmed bug.
+   It sweeps the critical and high scanner entries, so an exploitable issue that
+   only a scanner saw still becomes a finding, and it searches for variants of
+   each confirmed bug.
 5. **The report step** writes the report and creates the fix cards. It skips a
    finding that already has a card, so re-audits do not create duplicates.
 
@@ -48,11 +50,14 @@ context first, then candidates, then independent verification of each one.
 
 ## What it costs
 
-On one real run against a Rails + React monolith (about 500 entry points,
-standard depth), the audit took **53 minutes** and cost about **$53** in model
-usage. It produced 23 candidates, of which 15 were verified. `quick` depth
-covers the top components only and is a fraction of that. Fix runs are priced
-per card.
+Measured on two real runs:
+
+| Target | Depth | Time | Model usage | Candidates → verified |
+|---|---|---|---|---|
+| Rails + React monolith, ~500 entry points | standard | 53 min | ~$53 | 23 → 15 |
+| OWASP Juice Shop (Node/Express) | quick | 39 min | ~$18 | 56 → 41 |
+
+On Juice Shop the audit found the benchmark's classic flaws from the code alone: SQL injection, admin self-registration, JWT forgery, code injection, XXE, zip slip, SSRF, NoSQL injection, forged coupons and a set of IDORs. It did not read the challenge list. Fix runs are priced per card.
 
 ## Starting an audit
 
@@ -92,8 +97,8 @@ This template bundles snapshots of these skills, unmodified:
 
 - **Trail of Bits** (https://github.com/trailofbits/skills), licensed
   CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
-  `audit-context-building`, `entry-point-analyzer`, `insecure-defaults`,
-  `fp-check`, `variant-analysis`.
+  `audit-context-building`, `insecure-defaults`, `fp-check`,
+  `variant-analysis`.
 - **Sentry** (https://github.com/getsentry/skills), licensed Apache-2.0:
   `security-review`, `gha-security-review`. Their LICENSE file is included.
 - **OpenAI** (https://github.com/openai/skills): `security-threat-model`. Its
