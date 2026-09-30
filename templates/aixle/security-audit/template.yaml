@@ -1,7 +1,7 @@
 format_version: 1
 namespace: aixle
 slug: security-audit
-version: 1
+version: 2
 name: Security Audit
 summary: White-box security audit of a repository — threat model, pinned scanners,
   parallel hunts, skeptic verification — that turns every confirmed finding into a
@@ -154,30 +154,6 @@ skills:
     from: snapshots/skills/audit_context_building/resources/DOMAIN_NOTES.md
   - path: resources/FUNCTION_MICRO_ANALYSIS_EXAMPLE.md
     from: snapshots/skills/audit_context_building/resources/FUNCTION_MICRO_ANALYSIS_EXAMPLE.md
-- key: entry_point_analyzer
-  registry: trailofbits/skills@entry-point-analyzer
-  snapshot:
-    path: snapshots/skills/entry_point_analyzer.md
-    sha256: 0d0e2956bdf9bf5be7efdfcefc754cabd2c1deb015731f3341f919eae2a0e3ca
-  files:
-  - path: agents/openai.yaml
-    from: snapshots/skills/entry_point_analyzer/agents/openai.yaml
-  - path: assets/trail-of-bits-mark.svg
-    from: snapshots/skills/entry_point_analyzer/assets/trail-of-bits-mark.svg
-  - path: references/cosmwasm.md
-    from: snapshots/skills/entry_point_analyzer/references/cosmwasm.md
-  - path: references/move-aptos.md
-    from: snapshots/skills/entry_point_analyzer/references/move-aptos.md
-  - path: references/move-sui.md
-    from: snapshots/skills/entry_point_analyzer/references/move-sui.md
-  - path: references/solana.md
-    from: snapshots/skills/entry_point_analyzer/references/solana.md
-  - path: references/solidity.md
-    from: snapshots/skills/entry_point_analyzer/references/solidity.md
-  - path: references/ton.md
-    from: snapshots/skills/entry_point_analyzer/references/ton.md
-  - path: references/vyper.md
-    from: snapshots/skills/entry_point_analyzer/references/vyper.md
 - key: security_threat_model
   registry: openai/skills@security-threat-model
   snapshot:
@@ -383,7 +359,7 @@ workflows:
 
       Read the audit card first (`board_get_task`). Its description may set **scope** (paths to include or exclude), **depth** (quick / standard / deep; default standard) and context about how the system is deployed. Respect it.
 
-      Use the `entry-point-analyzer`, `audit-context-building` and `security-threat-model` skills as your method.
+      Use the `audit-context-building` and `security-threat-model` skills as your method.
 
       Write to `/workspace/outputs/`. Write each document **section by section**, per "Engagement context" in the rubric: create the file with its first section, then append each following section as a separate edit. Keep the threat model descriptive and defensive: it names weaknesses and where they are, not how to exploit them.
 
@@ -398,23 +374,22 @@ workflows:
            - where input is validated
            - how output is encoded
            - how secrets are loaded
-         - STRIDE table: one row per trust boundary, each pointing at the code it concerns. Keep cells short.
+         - STRIDE table: one row per trust boundary, each row pointing at the code it concerns. Keep cells short.
          - Assumptions and unknowns.
          - Top 10 hotspots: the files or areas most likely to hold serious bugs, and why.
-      2. **`entry-points.md`**: a table of every externally reachable entry point. Columns: method + path (or trigger), handler file:line, auth required (none / user / admin), and the authz check it applies (or "NONE FOUND"). Group the table by component. Include webhooks, file uploads, websocket handlers, background jobs that consume external data, and GitHub Actions workflows.
+      2. **`entry-points.md`**: a table of every externally reachable entry point. Find them from the framework's routing (route files, decorators, controller and handler registration), not by grepping for handlers. Columns: method + path (or trigger), handler file:line, auth required (none / user / admin), and the authz check it applies (or "NONE FOUND"). Group the table by component. Include webhooks, file uploads, websocket handlers, background jobs that consume external data, and GitHub Actions workflows.
 
       Depth:
       - quick: top 3 components only.
       - standard: everything in scope.
       - deep: also trace which helper each route actually calls for authz.
 
-      If a write is interrupted, follow the rubric's retry rule. Fail the step only when a required section is still missing after two attempts, and say which one.
+      If a write is interrupted, follow the rubric's retry rule. Fail the step only when a required section is still missing after two attempts, and say which section.
 
       Finish by commenting on the audit card: a 5-line summary, the entry-point count, and the hotspot list.
     agent: recon_analyst
     skills:
     - audit_context_building
-    - entry_point_analyzer
     - security_threat_model
     on_failure: fail
     skip_policy: never
@@ -526,21 +501,22 @@ workflows:
   - key: hunt_secrets_crypto_config_and_supply_chain
     name: 'Hunt: secrets, crypto, config and supply chain'
     instructions: |-
-      Hunt for **secrets, cryptography, insecure configuration and CI/supply-chain** vulnerabilities in `/workspace/repo`, and triage the scanner results. This hunt is read-only.
+      Hunt for **secrets, cryptography, insecure configuration and CI/supply-chain** vulnerabilities in the target repository, and triage the scanner results. This hunt is read-only.
 
       Inputs (in `/workspace/assets/`): `threat-model.md`, `entry-points.md`, `scanner-findings.json`, `scanner-summary.md`. Read the audit card for scope (`board_get_task`).
 
       Method:
-      1. **Scanner triage.** Promote a scanner entry to a candidate only with added evidence:
-         - Secrets: is it real and still in use, or a placeholder or test fixture? Is it in shipped code or in history only?
-         - Dependency CVEs: is the vulnerable function or feature actually used? Cite the call site.
-         - trivy misconfigurations: is the Dockerfile or IaC actually deployed?
-         - zizmor: is the workflow triggered by untrusted input?
-      2. **Crypto.**
-         - Hand-rolled crypto, ECB, static IVs, MD5/SHA1 for passwords, missing salt, low bcrypt cost.
-         - `Math.random` / `rand` for tokens.
-         - Non-constant-time secret comparison.
-         - JWT signing with a hardcoded or weak key.
+      1. **Scanner triage.** Apply "Scanner evidence joins a finding" in `security-finding-rubric`. Turn every scanner entry that is exploitable in this code into a candidate, with `related_scan_ids` set. Collapse several entries with one root cause into one candidate. Decide exploitability this way:
+         - **Secrets:** it is exploitable if it is real and usable, not a placeholder or test fixture. Say whether it is in shipped code or only in history, and what an attacker could do with it.
+         - **Dependency CVEs:** it is exploitable if the vulnerable function or feature is actually used. Cite the call site.
+         - **trivy misconfigurations:** they count only if the Dockerfile or IaC is actually deployed.
+         - **zizmor:** it counts if the workflow is triggered by untrusted input.
+         Leave the rest out, and list what you dropped and why in `/workspace/outputs/scanner-triage-config.md`.
+      2. **Crypto:**
+         - hand-rolled crypto, ECB, static IVs, MD5/SHA1 for passwords, missing salt, low bcrypt cost
+         - `Math.random` / `rand` used for tokens
+         - non-constant-time secret comparison
+         - JWT signing with a hardcoded or weak key
       3. **Insecure defaults** (`insecure-defaults` skill):
          - debug mode in production config
          - permissive CORS with credentials
@@ -553,10 +529,10 @@ workflows:
          - `pull_request_target` with a checkout of the PR head
          - expression injection of `${{ github.event.* }}` into `run:`
          - over-broad `GITHUB_TOKEN` permissions
-         - actions not pinned to a SHA
+         - actions not pinned to a SHA, when they run with secrets
          - secrets exposed to fork PRs
 
-      Output `/workspace/outputs/candidates-config.json`: an array in the `security-finding-rubric` candidate schema, with ids `H-CFG-NNN` and `related_scan_ids` filled. Never write a secret value; cite file, line, commit and rule only.
+      Output `/workspace/outputs/candidates-config.json`: an array in the `security-finding-rubric` candidate schema, with ids `H-CFG-NNN` and `related_scan_ids` filled in. Never write a secret value; cite file, line, commit and rule only.
     agent: vulnerability_hunter
     skills:
     - security_review
@@ -579,23 +555,24 @@ workflows:
       - `candidates-access.json`, `candidates-injection.json`, `candidates-config.json`
       - `threat-model.md`, `entry-points.md`, `scanner-findings.json`
 
-      Method (use the `fp-check` skill, plus the verification standard in `security-finding-rubric`):
-      1. Merge the three candidate files. Deduplicate candidates that describe the same root cause, keeping the best-evidenced one and noting the merged ids.
-      2. For each candidate, re-read the code at every hop of its path yourself. Do not trust the hunter's quotes. Then:
+      Method: use the `fp-check` skill and the verification standard in `security-finding-rubric`.
+      1. Merge the three candidate files. Where candidates describe the same root cause, keep the best-evidenced one, mark the others `MERGED`, and join their `related_scan_ids`.
+      2. **Scanner sweep.** Go through every critical and high entry in `scanner-findings.json`, plus every secret entry. Check that each one either belongs to a candidate or was left out for a stated reason. If an entry looks exploitable and no candidate covers it, add it as a candidate yourself (id `V-SCAN-NNN`). A scanner overlap is never a reason to exclude a candidate.
+      3. For each candidate, re-read the code at every hop of its path yourself; do not trust the hunter's quotes. Then:
          - search for the guard the hunter missed (middleware, base-class hooks, default scopes, framework escaping, validation)
          - confirm the entry point is routed and reachable in the shipped configuration
-         - write a concrete exploit sketch: input and observable result
-      3. Give each candidate a verdict of `TRUE_POSITIVE`, `FALSE_POSITIVE` or `EXCLUDED` (hard exclusion), with a one-line reason. A TRUE_POSITIVE needs confidence ≥ 0.8.
-      4. For each TRUE_POSITIVE:
+         - write the one-line exploit sketch: input and observable result
+      4. Give each candidate a verdict: `TRUE_POSITIVE`, `FALSE_POSITIVE`, `EXCLUDED` (hard exclusion) or `MERGED`, with a one-line reason. A TRUE_POSITIVE needs confidence ≥ 0.8.
+      5. For each TRUE_POSITIVE:
          - assign severity per the rubric
          - write `remediation` (concrete, idiomatic for this framework) and a `regression_test`
          - run `variant-analysis`: search for the same pattern elsewhere, and emit each confirmed variant as its own verified finding with `variants_of` set
-      5. Number the verified findings `SA-001…` in severity order.
+      6. Number the verified findings `SA-001…` in severity order.
 
       Outputs to `/workspace/outputs/`:
-      - `verified-findings.json`: TRUE_POSITIVE findings in the rubric's verified schema
-      - `rejected-candidates.json`: every rejected candidate with its verdict and reason
-      - `verification-stats.md`: candidates in / merged / true / false / excluded, per hunt. This measures how noisy each hunt was.
+      - `verified-findings.json`: the TRUE_POSITIVE findings, in the rubric's verified schema
+      - `rejected-candidates.json`: every other candidate, with its verdict and reason
+      - `verification-stats.md`: candidates in / merged / true / false / excluded, per hunt plus the scanner sweep. This is how noisy each hunt was.
 
       Comment on the audit card with the stats table and the list of verified findings (id, severity, title).
     agent: skeptic_verifier
@@ -623,22 +600,22 @@ workflows:
       - `threat-model.md`, `entry-points.md`, `scanner-summary.md`
 
       1. Write **`/workspace/outputs/SECURITY-AUDIT.md`** with these sections:
-         - **Executive summary**: 5 lines at most, the overall posture, and counts by severity.
+         - **Executive summary**: 5 lines at most, covering the overall posture and counts by severity.
          - **Findings table**: id, severity, title, CWE, OWASP 2025, location.
          - **Findings**: one section per finding, with description, attack path, exploit sketch, remediation and regression test.
-         - **Scope and method**: the commit SHA of `/workspace/repo` (`git -C /workspace/repo rev-parse HEAD`), scope, depth, tools and versions that ran, and coverage gaps (unavailable scanners, excluded paths, assumptions from the threat model).
-         - **Appendix**: verification stats and rejected-candidate counts by reason. List counts only, not the rejected details.
-      2. Attach `SECURITY-AUDIT.md` to the audit card with `board_attach_asset`.
-      3. **Create one fix task per verified finding** in the column **Fix Backlog**, exactly as the `security-fix-task` skill specifies (title format, priority, tags, description sections).
-         - Check the existing cards first (`board_list_tasks`) so that a re-audit does not create duplicates.
-         - If a finding matches an existing card, add a comment on that card saying it was re-confirmed by this audit instead of creating a new card.
+         - **Scope and method**: the commit SHA of the target checkout (`git -C <checkout> rev-parse HEAD`), scope, depth, tools and versions that ran, and coverage gaps (unavailable scanners, excluded paths, assumptions from the threat model).
+         - **Appendix**: verification stats and rejected-candidate counts by reason (counts only, not the rejected details).
+      2. **Create one fix task per verified finding** in the column **Fix Backlog**, exactly as the `security-fix-task` skill specifies (title format, priority, tags, assignee, description sections).
+         - Check the existing cards first (`board_list_tasks`), so that a re-audit does not create duplicates.
+         - If a finding matches an existing card, do not create a new card. Add a comment on the existing card saying this audit re-confirmed it.
+      3. Once the report and every card are final, attach `SECURITY-AUDIT.md` to the audit card with `board_attach_asset`, **exactly once**. Do not attach drafts. If you already attached a version, do not attach another.
       4. Comment on the audit card with:
          - the executive summary
-         - the list of fix cards created and re-confirmed, as id + title
+         - the fix cards created and re-confirmed, as id + title
          - the coverage gaps
       5. Move the audit card to **Audit Complete**.
 
-      If `verified-findings.json` is empty, still write the report (a clean result with its coverage gaps is a valid outcome), create no fix cards, and move the card.
+      If `verified-findings.json` is empty, still write and attach the report (a clean result with its coverage gaps is a valid outcome), create no fix cards, and move the card.
     agent: security_reporter
     tools:
     - board_list_tasks
