@@ -1,0 +1,719 @@
+format_version: 1
+namespace: aixle
+slug: security-audit
+version: 1
+name: Security Audit
+summary: White-box security audit of a repository — threat model, pinned scanners,
+  parallel hunts, skeptic verification — that turns every confirmed finding into a
+  fix task and a patch.
+board:
+  name: Security Audit
+  columns:
+  - key: audit_queue
+    name: Audit Queue
+    purpose: |-
+      Audit requests: one card is one audit of one repository. Move the card to Auditing to start. Write the description as:
+      ## Scope
+      - Repository: <repository name as attached to the project>
+      - Include: <paths, or "everything">
+      - Exclude: <paths, e.g. test/, docs/, vendor/>
+      ## Depth
+      quick | standard | deep
+      ## Context
+      What the system does, who its users and tenants are, how it is deployed, and what matters most to protect.
+  - key: auditing
+    name: Auditing
+    purpose: 'An audit is running: recon, scanners, hunting, verification, report.
+      The audit workflow fires when a card enters this column.'
+  - key: audit_complete
+    name: Audit Complete
+    purpose: The audit finished. The card carries SECURITY-AUDIT.md and a summary
+      comment; every confirmed finding became its own card in Fix Backlog.
+  - key: fix_backlog
+    name: Fix Backlog
+    purpose: 'Confirmed findings waiting for triage. One card = one vulnerability
+      with evidence, severity, CWE and a remediation plan. A human decides: move to
+      Fixing, or to Won''t Fix with a reason.'
+  - key: fixing
+    name: Fixing
+    purpose: 'A fix is being implemented. The fix workflow fires when a card enters
+      this column: it writes a regression test that reproduces the issue, fixes it,
+      and opens a pull request.'
+  - key: fix_in_review
+    name: Fix In Review
+    purpose: A pull request with the fix is open and waiting for human review. The
+      card links the PR.
+  - key: done
+    name: Done
+    purpose: Fix merged, or audit closed.
+  - key: won_t_fix
+    name: Won't Fix
+    purpose: Findings triaged as accepted risk, false positive or out of scope. The
+      card must carry a comment with the reason.
+agents:
+- key: recon_analyst
+  name: recon_analyst
+  title: Security Recon Analyst
+  icon: search
+  persona: An application security architect who maps a codebase before anyone hunts
+    in it. You find every place untrusted input enters (HTTP routes, GraphQL, websockets,
+    webhooks, queue consumers, CLI args, file uploads, scheduled jobs reading external
+    data), every trust boundary, every asset worth stealing, and every authentication
+    and authorization mechanism, and you write it down so that later agents can hunt
+    with a map instead of a guess.
+  principles: |-
+    - Ground every claim in a file:line. No generic threats that do not map to this code.
+    - Coverage over depth: a complete entry-point inventory beats a deep dive into one route.
+    - Name the security mechanisms precisely (which middleware, which decorator, which ORM scope) so hunters can check whether each route actually uses them.
+    - Note what you could not determine (deployment config, infra, runtime flags) as explicit assumptions.
+    - You do not report vulnerabilities; you point at where they are likely.
+  communication_style: Terse, structured, tables and file:line references. English.
+- key: vulnerability_hunter
+  name: vulnerability_hunter
+  title: Vulnerability Hunter
+  icon: bug
+  persona: 'An offensive security researcher doing a white-box code audit. You think
+    like an attacker holding the threat model: for each entry point you ask what input
+    you control, where it flows, and which check stands between it and a sink. You
+    trace data flow across files instead of pattern-matching single lines, and you
+    care about logic bugs (missing ownership checks, broken state machines, trust
+    in client-supplied ids) as much as classic injection.'
+  principles: |-
+    - Start from the threat model's entry points and trust boundaries, not from a grep for dangerous functions.
+    - Every candidate needs a traced source -> sink path with file:line per hop. No path, no candidate.
+    - Read the guard before you claim it is missing: middleware, base-class hooks, ORM default scopes, framework auto-escaping.
+    - Respect the hard exclusions in security-finding-rubric. Quantity is not the goal; one real IDOR beats ten style nits.
+    - Never run exploits against live systems. Reading code and running local static tools only.
+  communication_style: Precise and evidence-first. Candidates in the rubric's JSON
+    schema. English.
+- key: skeptic_verifier
+  name: skeptic_verifier
+  title: Skeptic Verifier
+  icon: shield
+  persona: A senior security reviewer whose job is to kill false positives. You receive
+    candidate findings from other agents and assume each one is wrong until the code
+    proves otherwise. You re-trace every hop yourself, hunt for the guard the hunter
+    missed, check that the entry point is actually reachable, and only let through
+    findings you would sign your name under in a client report. When a finding survives,
+    you look for its siblings elsewhere in the code.
+  principles: |-
+    - Independent re-derivation: do not trust the candidate's path, re-read the code at every cited line.
+    - A finding is TRUE_POSITIVE only at confidence >= 0.8 with a concrete exploit sketch and no hard exclusion.
+    - Record why each rejected candidate was rejected; that record is how the pipeline improves.
+    - Severity follows impact and preconditions from the rubric, not the hunter's excitement.
+    - Variants of a confirmed bug are cheap high-value findings; always look.
+  communication_style: Dry, skeptical, verdict-first. English.
+- key: security_reporter
+  name: security_reporter
+  title: Security Report Writer
+  icon: file-text
+  persona: 'A security consultant who turns verified findings into a report an engineering
+    lead can act on in one read, and into fix tasks an engineer can pick up without
+    re-doing the research. You write for two audiences: the executive summary for
+    the person deciding priorities, and the per-finding detail for the person writing
+    the patch.'
+  principles: |-
+    - Report only verified TRUE_POSITIVE findings; list rejected candidates only as counts in the appendix.
+    - Order by severity, then by ease of exploitation.
+    - Every fix task must be actionable on its own: location, attack path, concrete fix, regression test.
+    - Never duplicate a fix task that already exists on the board.
+    - Never write secret values anywhere.
+  communication_style: Clear, plain English, no hype words. Tables for summaries.
+- key: security_fix_engineer
+  name: security_fix_engineer
+  title: Security Fix Engineer
+  icon: wrench
+  persona: 'A product engineer who fixes security bugs the way the codebase would
+    want them fixed: with the framework''s own mechanism, a regression test that proves
+    the hole is closed, and the smallest change that closes the root cause. You follow
+    the repository''s conventions (its CLAUDE.md / CONTRIBUTING, test layout, commit
+    style) over your own preferences.'
+  principles: |-
+    - Regression test first; it must fail on the unfixed code.
+    - Fix the root cause and the listed variants, nothing else. No drive-by refactors.
+    - If the finding does not reproduce, say so with evidence instead of forcing a change.
+    - A leaked secret is fixed by rotation first; say so explicitly.
+    - Never push a vulnerability description to a public place without human approval.
+  communication_style: Short, concrete, shows test output. English.
+skills:
+- key: security_finding_rubric
+  path: skills/security_finding_rubric/SKILL.md
+- key: audit_context_building
+  registry: trailofbits/skills@audit-context-building
+  snapshot:
+    path: snapshots/skills/audit_context_building.md
+    sha256: 33fa693dc6e166cfa4919e4373cb6578c009d296234c2ae7cb3cd4e79b443765
+  files:
+  - path: agents/openai.yaml
+    from: snapshots/skills/audit_context_building/agents/openai.yaml
+  - path: assets/trail-of-bits-mark.svg
+    from: snapshots/skills/audit_context_building/assets/trail-of-bits-mark.svg
+  - path: resources/ANALYSIS_FORMAT.md
+    from: snapshots/skills/audit_context_building/resources/ANALYSIS_FORMAT.md
+  - path: resources/DOMAIN_NOTES.md
+    from: snapshots/skills/audit_context_building/resources/DOMAIN_NOTES.md
+  - path: resources/FUNCTION_MICRO_ANALYSIS_EXAMPLE.md
+    from: snapshots/skills/audit_context_building/resources/FUNCTION_MICRO_ANALYSIS_EXAMPLE.md
+- key: entry_point_analyzer
+  registry: trailofbits/skills@entry-point-analyzer
+  snapshot:
+    path: snapshots/skills/entry_point_analyzer.md
+    sha256: 0d0e2956bdf9bf5be7efdfcefc754cabd2c1deb015731f3341f919eae2a0e3ca
+  files:
+  - path: agents/openai.yaml
+    from: snapshots/skills/entry_point_analyzer/agents/openai.yaml
+  - path: assets/trail-of-bits-mark.svg
+    from: snapshots/skills/entry_point_analyzer/assets/trail-of-bits-mark.svg
+  - path: references/cosmwasm.md
+    from: snapshots/skills/entry_point_analyzer/references/cosmwasm.md
+  - path: references/move-aptos.md
+    from: snapshots/skills/entry_point_analyzer/references/move-aptos.md
+  - path: references/move-sui.md
+    from: snapshots/skills/entry_point_analyzer/references/move-sui.md
+  - path: references/solana.md
+    from: snapshots/skills/entry_point_analyzer/references/solana.md
+  - path: references/solidity.md
+    from: snapshots/skills/entry_point_analyzer/references/solidity.md
+  - path: references/ton.md
+    from: snapshots/skills/entry_point_analyzer/references/ton.md
+  - path: references/vyper.md
+    from: snapshots/skills/entry_point_analyzer/references/vyper.md
+- key: security_threat_model
+  registry: openai/skills@security-threat-model
+  snapshot:
+    path: snapshots/skills/security_threat_model.md
+    sha256: 1283c0dd62a8104d9edda4583569b5d8510b4ddaa45120687c999250fd96bad2
+  files:
+  - path: LICENSE.txt
+    from: snapshots/skills/security_threat_model/LICENSE.txt
+  - path: agents/openai.yaml
+    from: snapshots/skills/security_threat_model/agents/openai.yaml
+  - path: references/prompt-template.md
+    from: snapshots/skills/security_threat_model/references/prompt-template.md
+  - path: references/security-controls-and-assets.md
+    from: snapshots/skills/security_threat_model/references/security-controls-and-assets.md
+- key: security_scanners
+  path: skills/security_scanners/SKILL.md
+- key: security_review
+  registry: getsentry/skills@security-review
+  snapshot:
+    path: snapshots/skills/security_review.md
+    sha256: 6d36fa39ada88c8e66fdd4c52c3b846b0f27602d49871856d4bff90cc94719e5
+  files:
+  - path: LICENSE
+    from: snapshots/skills/security_review/LICENSE
+  - path: infrastructure/docker.md
+    from: snapshots/skills/security_review/infrastructure/docker.md
+  - path: languages/javascript.md
+    from: snapshots/skills/security_review/languages/javascript.md
+  - path: languages/python.md
+    from: snapshots/skills/security_review/languages/python.md
+  - path: references/api-security.md
+    from: snapshots/skills/security_review/references/api-security.md
+  - path: references/authentication.md
+    from: snapshots/skills/security_review/references/authentication.md
+  - path: references/authorization.md
+    from: snapshots/skills/security_review/references/authorization.md
+  - path: references/business-logic.md
+    from: snapshots/skills/security_review/references/business-logic.md
+  - path: references/cryptography.md
+    from: snapshots/skills/security_review/references/cryptography.md
+  - path: references/csrf.md
+    from: snapshots/skills/security_review/references/csrf.md
+  - path: references/data-protection.md
+    from: snapshots/skills/security_review/references/data-protection.md
+  - path: references/deserialization.md
+    from: snapshots/skills/security_review/references/deserialization.md
+  - path: references/error-handling.md
+    from: snapshots/skills/security_review/references/error-handling.md
+  - path: references/file-security.md
+    from: snapshots/skills/security_review/references/file-security.md
+  - path: references/injection.md
+    from: snapshots/skills/security_review/references/injection.md
+  - path: references/logging.md
+    from: snapshots/skills/security_review/references/logging.md
+  - path: references/misconfiguration.md
+    from: snapshots/skills/security_review/references/misconfiguration.md
+  - path: references/modern-threats.md
+    from: snapshots/skills/security_review/references/modern-threats.md
+  - path: references/ssrf.md
+    from: snapshots/skills/security_review/references/ssrf.md
+  - path: references/supply-chain.md
+    from: snapshots/skills/security_review/references/supply-chain.md
+  - path: references/xss.md
+    from: snapshots/skills/security_review/references/xss.md
+- key: insecure_defaults
+  registry: trailofbits/skills@insecure-defaults
+  snapshot:
+    path: snapshots/skills/insecure_defaults.md
+    sha256: b1b95a2fa5b661a20c3812912f49d1063533dc7dbef726e70c9757424b6cdcbc
+  files:
+  - path: agents/openai.yaml
+    from: snapshots/skills/insecure_defaults/agents/openai.yaml
+  - path: assets/trail-of-bits-mark.svg
+    from: snapshots/skills/insecure_defaults/assets/trail-of-bits-mark.svg
+  - path: references/examples.md
+    from: snapshots/skills/insecure_defaults/references/examples.md
+- key: gha_security_review
+  registry: getsentry/skills@gha-security-review
+  snapshot:
+    path: snapshots/skills/gha_security_review.md
+    sha256: 2820545333988c4834fe6ac4e05d3efafc02bd0e4097e0f28f4ebfc48e116a3d
+  files:
+  - path: references/ai-prompt-injection-via-ci.md
+    from: snapshots/skills/gha_security_review/references/ai-prompt-injection-via-ci.md
+  - path: references/comment-triggered-commands.md
+    from: snapshots/skills/gha_security_review/references/comment-triggered-commands.md
+  - path: references/credential-escalation.md
+    from: snapshots/skills/gha_security_review/references/credential-escalation.md
+  - path: references/expression-injection.md
+    from: snapshots/skills/gha_security_review/references/expression-injection.md
+  - path: references/permissions-and-secrets.md
+    from: snapshots/skills/gha_security_review/references/permissions-and-secrets.md
+  - path: references/pwn-request.md
+    from: snapshots/skills/gha_security_review/references/pwn-request.md
+  - path: references/real-world-attacks.md
+    from: snapshots/skills/gha_security_review/references/real-world-attacks.md
+  - path: references/runner-infrastructure.md
+    from: snapshots/skills/gha_security_review/references/runner-infrastructure.md
+  - path: references/supply-chain.md
+    from: snapshots/skills/gha_security_review/references/supply-chain.md
+- key: fp_check
+  registry: trailofbits/skills@fp-check
+  snapshot:
+    path: snapshots/skills/fp_check.md
+    sha256: 129223b79b8cb1e7c289c90cbe4ba288d9b210e318a0d1464f319e30329481b3
+  files:
+  - path: agents/openai.yaml
+    from: snapshots/skills/fp_check/agents/openai.yaml
+  - path: assets/trail-of-bits-mark.svg
+    from: snapshots/skills/fp_check/assets/trail-of-bits-mark.svg
+  - path: references/bug-class-verification.md
+    from: snapshots/skills/fp_check/references/bug-class-verification.md
+  - path: references/deep-verification.md
+    from: snapshots/skills/fp_check/references/deep-verification.md
+  - path: references/evidence-templates.md
+    from: snapshots/skills/fp_check/references/evidence-templates.md
+  - path: references/false-positive-patterns.md
+    from: snapshots/skills/fp_check/references/false-positive-patterns.md
+  - path: references/gate-reviews.md
+    from: snapshots/skills/fp_check/references/gate-reviews.md
+  - path: references/standard-verification.md
+    from: snapshots/skills/fp_check/references/standard-verification.md
+- key: variant_analysis
+  registry: trailofbits/skills@variant-analysis
+  snapshot:
+    path: snapshots/skills/variant_analysis.md
+    sha256: 7b6b78e499bcb88d05c68254ffc91ebc28edabf4e9808adcc40e2628ebb9407e
+  files:
+  - path: agents/openai.yaml
+    from: snapshots/skills/variant_analysis/agents/openai.yaml
+  - path: assets/trail-of-bits-mark.svg
+    from: snapshots/skills/variant_analysis/assets/trail-of-bits-mark.svg
+  - path: references/reporting.md
+    from: snapshots/skills/variant_analysis/references/reporting.md
+  - path: references/root-cause.md
+    from: snapshots/skills/variant_analysis/references/root-cause.md
+  - path: references/searching.md
+    from: snapshots/skills/variant_analysis/references/searching.md
+  - path: references/triage.md
+    from: snapshots/skills/variant_analysis/references/triage.md
+  - path: resources/codeql/cpp.ql
+    from: snapshots/skills/variant_analysis/resources/codeql/cpp.ql
+  - path: resources/codeql/go.ql
+    from: snapshots/skills/variant_analysis/resources/codeql/go.ql
+  - path: resources/codeql/java.ql
+    from: snapshots/skills/variant_analysis/resources/codeql/java.ql
+  - path: resources/codeql/javascript.ql
+    from: snapshots/skills/variant_analysis/resources/codeql/javascript.ql
+  - path: resources/codeql/python.ql
+    from: snapshots/skills/variant_analysis/resources/codeql/python.ql
+  - path: resources/semgrep/cpp.yaml
+    from: snapshots/skills/variant_analysis/resources/semgrep/cpp.yaml
+  - path: resources/semgrep/go.yaml
+    from: snapshots/skills/variant_analysis/resources/semgrep/go.yaml
+  - path: resources/semgrep/java.yaml
+    from: snapshots/skills/variant_analysis/resources/semgrep/java.yaml
+  - path: resources/semgrep/javascript.yaml
+    from: snapshots/skills/variant_analysis/resources/semgrep/javascript.yaml
+  - path: resources/semgrep/python.yaml
+    from: snapshots/skills/variant_analysis/resources/semgrep/python.yaml
+  - path: resources/variant-report-template.md
+    from: snapshots/skills/variant_analysis/resources/variant-report-template.md
+- key: security_fix_task
+  path: skills/security_fix_task/SKILL.md
+tools:
+- key: board_get_task
+  platform: board_get_task
+- key: board_get_comments
+  platform: board_get_comments
+- key: board_add_comment
+  platform: board_add_comment
+- key: board_list_tasks
+  platform: board_list_tasks
+- key: board_create_task
+  platform: board_create_task
+- key: board_move_task
+  platform: board_move_task
+- key: board_attach_asset
+  platform: board_attach_asset
+- key: board_manage_tags
+  platform: board_manage_tags
+workflows:
+- key: repository_security_audit
+  name: Repository security audit
+  description: 'White-box security audit of the project repository: recon/threat model
+    and deterministic scanners in parallel, three parallel vulnerability hunts, independent
+    skeptic verification, then a report and one Fix Backlog card per confirmed finding.
+    Starts when an audit card enters Auditing.'
+  base:
+    tools:
+    - board_get_task
+    - board_get_comments
+    - board_add_comment
+    skills:
+    - security_finding_rubric
+    repositories:
+    - target
+  steps:
+  - key: recon_and_threat_model
+    name: Recon and threat model
+    instructions: |-
+      Map the target repository (see "Target repository" in `security-finding-rubric`) for the security audit. This is read-only: change no code, run nothing against external systems.
+
+      Read the audit card first (`board_get_task`). Its description may set **scope** (paths to include or exclude), **depth** (quick / standard / deep; default standard) and context about how the system is deployed. Respect it.
+
+      Use the `entry-point-analyzer`, `audit-context-building` and `security-threat-model` skills as your method.
+
+      Write to `/workspace/outputs/`. Write each document **section by section**, per "Engagement context" in the rubric: create the file with its first section, then append each following section as a separate edit. Keep the threat model descriptive and defensive: it names weaknesses and where they are, not how to exploit them.
+
+      1. **`threat-model.md`**
+         - System summary: stack, frameworks, and the deployable units (web app, API, workers, CLI).
+         - Assets: data and capabilities that need protecting, such as PII, credentials, money, admin actions and tenant data.
+         - Actors and privilege levels: anonymous, user, admin, other tenant, service.
+         - Trust boundaries, and how data crosses each one.
+         - Security mechanisms, precisely:
+           - how authentication happens (file:line)
+           - how authorization is enforced (file:line)
+           - where input is validated
+           - how output is encoded
+           - how secrets are loaded
+         - STRIDE table: one row per trust boundary, each pointing at the code it concerns. Keep cells short.
+         - Assumptions and unknowns.
+         - Top 10 hotspots: the files or areas most likely to hold serious bugs, and why.
+      2. **`entry-points.md`**: a table of every externally reachable entry point. Columns: method + path (or trigger), handler file:line, auth required (none / user / admin), and the authz check it applies (or "NONE FOUND"). Group the table by component. Include webhooks, file uploads, websocket handlers, background jobs that consume external data, and GitHub Actions workflows.
+
+      Depth:
+      - quick: top 3 components only.
+      - standard: everything in scope.
+      - deep: also trace which helper each route actually calls for authz.
+
+      If a write is interrupted, follow the rubric's retry rule. Fail the step only when a required section is still missing after two attempts, and say which one.
+
+      Finish by commenting on the audit card: a 5-line summary, the entry-point count, and the hotspot list.
+    agent: recon_analyst
+    skills:
+    - audit_context_building
+    - entry_point_analyzer
+    - security_threat_model
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+  - key: run_scanners
+    name: Run scanners
+    instructions: |-
+      Collect deterministic scanner evidence for the audit of the target repository (see "Target repository" in `security-finding-rubric`).
+
+      1. Follow the `security-scanners` skill exactly:
+         - install the pinned, checksum-verified scanners
+         - run gitleaks, osv-scanner, trivy, and zizmor (zizmor only if `.github/workflows` exists)
+         - write the raw output to `/workspace/outputs/scanners/`
+      2. Normalize the results into `/workspace/outputs/scanner-findings.json` and `/workspace/outputs/scanner-summary.md`, as the skill describes.
+      3. Add a short supply-chain section to `scanner-summary.md` covering:
+         - direct vs transitive dependencies for each vulnerable package
+         - packages that look abandoned or typosquatted
+         - dependencies with install scripts
+         - GitHub Actions not pinned to a SHA
+         - tools downloaded without an integrity check (`curl | sh`, unpinned `latest`)
+      4. Respect scope exclusions from the audit card (`board_get_task`).
+
+      Do not judge exploitability here. Record what the tools say; the hunt and verify steps decide what matters. Secret values must never appear in any output or comment (gitleaks `--redact` is mandatory).
+
+      Finish by commenting on the audit card with the table of counts per tool and per category, plus any scanner that was unavailable.
+    agent: vulnerability_hunter
+    skills:
+    - security_scanners
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+  - key: hunt_access_control_and_business_logic
+    name: 'Hunt: access control and business logic'
+    instructions: |-
+      Hunt for **authentication, authorization and business-logic** vulnerabilities in `/workspace/repo`. This hunt is read-only.
+
+      Inputs (in `/workspace/assets/`): `threat-model.md`, `entry-points.md`, `scanner-findings.json`. Read the audit card for scope (`board_get_task`).
+
+      Method (use the `security-review` skill's authn/authz, business-logic and session references):
+      1. Walk `entry-points.md` row by row. For each handler, decide:
+         - Is authentication enforced, or can the route be reached anonymously when it should not be?
+         - Is the object loaded scoped to the caller? Look for IDOR / BOLA: a client-supplied id loaded without an ownership or tenant check.
+         - Is there function-level authz? Look for admin-only actions that are missing the role check.
+         - Is there mass assignment? Look for role, owner or price fields accepted from the request.
+      2. Authn internals:
+         - password reset and token flows (predictability, expiry, reuse)
+         - JWT handling (alg none, weak secret, unverified claims)
+         - session fixation
+         - OAuth `state` and redirect_uri checks
+         - 2FA bypass
+      3. Business logic:
+         - state machines that can be skipped (checkout, approval)
+         - negative quantities and prices
+         - race-prone balance or coupon updates
+         - trust in client-computed values
+      4. Where one route has a check and a sibling route lacks it, that is a candidate.
+
+      Output `/workspace/outputs/candidates-access.json`: an array in the `security-finding-rubric` candidate schema, with ids `H-ACCESS-NNN`. Include candidates with confidence ≥ 0.5 only. Every candidate needs a traced path with file:line per hop. Apply the hard exclusions.
+
+      Depth from the card: quick = top 20 routes by risk; standard = all; deep = all, plus every helper they call.
+    agent: vulnerability_hunter
+    skills:
+    - security_review
+    depends_on:
+    - recon_and_threat_model
+    - run_scanners
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+  - key: hunt_injection_and_data_flow
+    name: 'Hunt: injection and data flow'
+    instructions: |-
+      Hunt for **injection and unsafe data-flow** vulnerabilities in `/workspace/repo`. This hunt is read-only.
+
+      Inputs (in `/workspace/assets/`): `threat-model.md`, `entry-points.md`, `scanner-findings.json`. Read the audit card for scope (`board_get_task`).
+
+      Method (use the `security-review` skill's injection, XSS, SSRF, deserialization and file-handling references). Trace from every source in `entry-points.md` to these sinks:
+      - **SQL / NoSQL / ORM injection**: raw queries, string-built where-clauses, `$where`, and operator injection from JSON bodies.
+      - **OS command and code injection**: `exec`/`spawn`/`system`/backticks, `eval`/`Function`, template injection (SSTI).
+      - **XSS**:
+        - stored, reflected and DOM
+        - places that turn off auto-escaping (`html_safe`, `raw`, `dangerouslySetInnerHTML`, `bypassSecurityTrust*`, `v-html`)
+        - unsafe `href`/`src` with `javascript:`
+      - **SSRF**: server-side fetch of a user-supplied URL, including redirects, DNS rebinding, and cloud metadata.
+      - **Path traversal and file upload**: user-controlled paths, zip-slip, content-type trust, uploads served from the app origin.
+      - **Unsafe deserialization**: YAML/pickle/Marshal/`node-serialize`, XXE in XML parsers.
+      - **Open redirect, header or CRLF injection, prototype pollution**: deep merge of request JSON.
+
+      Prefer a full source → sink trace over sink grepping. A sink with no reachable attacker-controlled source is not a candidate.
+
+      Output `/workspace/outputs/candidates-injection.json`: an array in the `security-finding-rubric` candidate schema, with ids `H-INJ-NNN`, confidence ≥ 0.5, and file:line per hop. Apply the hard exclusions.
+    agent: vulnerability_hunter
+    skills:
+    - security_review
+    depends_on:
+    - recon_and_threat_model
+    - run_scanners
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+  - key: hunt_secrets_crypto_config_and_supply_chain
+    name: 'Hunt: secrets, crypto, config and supply chain'
+    instructions: |-
+      Hunt for **secrets, cryptography, insecure configuration and CI/supply-chain** vulnerabilities in `/workspace/repo`, and triage the scanner results. This hunt is read-only.
+
+      Inputs (in `/workspace/assets/`): `threat-model.md`, `entry-points.md`, `scanner-findings.json`, `scanner-summary.md`. Read the audit card for scope (`board_get_task`).
+
+      Method:
+      1. **Scanner triage.** Promote a scanner entry to a candidate only with added evidence:
+         - Secrets: is it real and still in use, or a placeholder or test fixture? Is it in shipped code or in history only?
+         - Dependency CVEs: is the vulnerable function or feature actually used? Cite the call site.
+         - trivy misconfigurations: is the Dockerfile or IaC actually deployed?
+         - zizmor: is the workflow triggered by untrusted input?
+      2. **Crypto.**
+         - Hand-rolled crypto, ECB, static IVs, MD5/SHA1 for passwords, missing salt, low bcrypt cost.
+         - `Math.random` / `rand` for tokens.
+         - Non-constant-time secret comparison.
+         - JWT signing with a hardcoded or weak key.
+      3. **Insecure defaults** (`insecure-defaults` skill):
+         - debug mode in production config
+         - permissive CORS with credentials
+         - CSRF disabled
+         - cookies without Secure/HttpOnly/SameSite
+         - default admin credentials
+         - fail-open error handling
+         - verbose stack traces returned to clients
+      4. **CI and supply chain** (`gha-security-review` skill):
+         - `pull_request_target` with a checkout of the PR head
+         - expression injection of `${{ github.event.* }}` into `run:`
+         - over-broad `GITHUB_TOKEN` permissions
+         - actions not pinned to a SHA
+         - secrets exposed to fork PRs
+
+      Output `/workspace/outputs/candidates-config.json`: an array in the `security-finding-rubric` candidate schema, with ids `H-CFG-NNN` and `related_scan_ids` filled. Never write a secret value; cite file, line, commit and rule only.
+    agent: vulnerability_hunter
+    skills:
+    - security_review
+    - insecure_defaults
+    - gha_security_review
+    depends_on:
+    - recon_and_threat_model
+    - run_scanners
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+  - key: verify_findings
+    name: Verify findings
+    instructions: |-
+      Independently verify every candidate finding. Your job is to reject whatever the code does not prove. This step is read-only: nothing may be executed against live systems.
+
+      Inputs (in `/workspace/assets/`):
+      - `candidates-access.json`, `candidates-injection.json`, `candidates-config.json`
+      - `threat-model.md`, `entry-points.md`, `scanner-findings.json`
+
+      Method (use the `fp-check` skill, plus the verification standard in `security-finding-rubric`):
+      1. Merge the three candidate files. Deduplicate candidates that describe the same root cause, keeping the best-evidenced one and noting the merged ids.
+      2. For each candidate, re-read the code at every hop of its path yourself. Do not trust the hunter's quotes. Then:
+         - search for the guard the hunter missed (middleware, base-class hooks, default scopes, framework escaping, validation)
+         - confirm the entry point is routed and reachable in the shipped configuration
+         - write a concrete exploit sketch: input and observable result
+      3. Give each candidate a verdict of `TRUE_POSITIVE`, `FALSE_POSITIVE` or `EXCLUDED` (hard exclusion), with a one-line reason. A TRUE_POSITIVE needs confidence ≥ 0.8.
+      4. For each TRUE_POSITIVE:
+         - assign severity per the rubric
+         - write `remediation` (concrete, idiomatic for this framework) and a `regression_test`
+         - run `variant-analysis`: search for the same pattern elsewhere, and emit each confirmed variant as its own verified finding with `variants_of` set
+      5. Number the verified findings `SA-001…` in severity order.
+
+      Outputs to `/workspace/outputs/`:
+      - `verified-findings.json`: TRUE_POSITIVE findings in the rubric's verified schema
+      - `rejected-candidates.json`: every rejected candidate with its verdict and reason
+      - `verification-stats.md`: candidates in / merged / true / false / excluded, per hunt. This measures how noisy each hunt was.
+
+      Comment on the audit card with the stats table and the list of verified findings (id, severity, title).
+    agent: skeptic_verifier
+    skills:
+    - fp_check
+    - variant_analysis
+    depends_on:
+    - recon_and_threat_model
+    - run_scanners
+    - hunt_access_control_and_business_logic
+    - hunt_injection_and_data_flow
+    - hunt_secrets_crypto_config_and_supply_chain
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+  - key: report_and_create_fix_tasks
+    name: Report and create fix tasks
+    instructions: |-
+      Turn the verified findings into a report and into fix tasks.
+
+      Inputs (in `/workspace/assets/`):
+      - `verified-findings.json`, `rejected-candidates.json`, `verification-stats.md`
+      - `threat-model.md`, `entry-points.md`, `scanner-summary.md`
+
+      1. Write **`/workspace/outputs/SECURITY-AUDIT.md`** with these sections:
+         - **Executive summary**: 5 lines at most, the overall posture, and counts by severity.
+         - **Findings table**: id, severity, title, CWE, OWASP 2025, location.
+         - **Findings**: one section per finding, with description, attack path, exploit sketch, remediation and regression test.
+         - **Scope and method**: the commit SHA of `/workspace/repo` (`git -C /workspace/repo rev-parse HEAD`), scope, depth, tools and versions that ran, and coverage gaps (unavailable scanners, excluded paths, assumptions from the threat model).
+         - **Appendix**: verification stats and rejected-candidate counts by reason. List counts only, not the rejected details.
+      2. Attach `SECURITY-AUDIT.md` to the audit card with `board_attach_asset`.
+      3. **Create one fix task per verified finding** in the column **Fix Backlog**, exactly as the `security-fix-task` skill specifies (title format, priority, tags, description sections).
+         - Check the existing cards first (`board_list_tasks`) so that a re-audit does not create duplicates.
+         - If a finding matches an existing card, add a comment on that card saying it was re-confirmed by this audit instead of creating a new card.
+      4. Comment on the audit card with:
+         - the executive summary
+         - the list of fix cards created and re-confirmed, as id + title
+         - the coverage gaps
+      5. Move the audit card to **Audit Complete**.
+
+      If `verified-findings.json` is empty, still write the report (a clean result with its coverage gaps is a valid outcome), create no fix cards, and move the card.
+    agent: security_reporter
+    tools:
+    - board_list_tasks
+    - board_create_task
+    - board_move_task
+    - board_attach_asset
+    - board_manage_tags
+    skills:
+    - security_fix_task
+    depends_on:
+    - recon_and_threat_model
+    - run_scanners
+    - verify_findings
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+- key: fix_security_finding
+  name: Fix security finding
+  description: 'Implements one Fix Backlog card: reproduces the finding with a regression
+    test, applies the minimal root-cause fix, and opens a pull request (or attaches
+    a patch when the repository is read-only). Starts when a card enters Fixing.'
+  base:
+    tools:
+    - board_get_task
+    - board_get_comments
+    - board_add_comment
+    - board_move_task
+    - board_attach_asset
+    - board_manage_tags
+    skills:
+    - security_fix_task
+    - security_finding_rubric
+    repositories:
+    - target
+  steps:
+  - key: reproduce_fix_and_open_pr
+    name: Reproduce, fix and open PR
+    instructions: |-
+      Implement the security fix described on this card, following the "Implementing a fix card" section of the `security-fix-task` skill.
+
+      1. Read the card and its comments (`board_get_task`, `board_get_comments`). Read the repository's contributor guidance first (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`), and follow its conventions for tests, commits and branches.
+      2. Re-check the finding against the current default branch in `/workspace/repo`. If it no longer reproduces, comment with the evidence, move the card to **Won't Fix**, and stop.
+      3. Create branch `security/<card id>-<slug>`.
+      4. Write the regression test from the card and run it. It must fail on the unfixed code.
+      5. Apply the minimal root-cause fix, including the variants listed on the card. No unrelated changes.
+      6. Run the regression test and the relevant part of the existing suite, and capture the output.
+      7. Commit: `fix(security): <title> (<CWE>)`.
+      8. Deliver the fix:
+         - **The repository accepts pushes** (`git push --dry-run` succeeds) **and is private**: push the branch and open a PR with `gh pr create`. Use the card's Finding / Attack path / Fix sections plus "Test evidence" (before/after output) as the body.
+         - **Read-only or public repository**: do not push. Write the fix with `git format-patch -1 --stdout > /workspace/outputs/fix-<card id>.patch`, attach it to the card with `board_attach_asset`, and say in a comment that a human must apply it through a private path.
+      9. Comment on the card with a summary, the PR link or patch name, and the test evidence. Then move the card to **Fix In Review**.
+
+      A leaked secret is fixed by rotation first. Say so on the card, and never put the value anywhere.
+    agent: security_fix_engineer
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+triggers:
+- kind: column
+  workflow: repository_security_audit
+  column: auditing
+  trigger_mode: auto
+  cooldown_seconds: 5
+- kind: column
+  workflow: fix_security_finding
+  column: fixing
+  trigger_mode: auto
+  cooldown_seconds: 5
+requires:
+  repositories:
+  - key: target
+    purpose: The repository to audit. Read-only access is enough for the audit; the fix
+      workflow opens pull requests only when the repository is private and writable,
+      otherwise it attaches a patch to the fix card.
