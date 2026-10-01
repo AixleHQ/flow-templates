@@ -120,10 +120,11 @@
             "enum": [
               "github",
               "gitlab",
-              "linear",
               "slack",
               "azure_devops",
-              "coder"
+              "coder",
+              "jira",
+              "tracker"
             ]
           },
           "uniqueItems": true
@@ -320,6 +321,30 @@
                 "type": "string",
                 "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
                 "maxLength": 255
+              },
+              "files": {
+                "type": "array",
+                "maxItems": 200,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+                      "maxLength": 255
+                    },
+                    "from": {
+                      "type": "string",
+                      "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+                      "maxLength": 255
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "from"
+                  ]
+                }
               }
             },
             "required": [
@@ -359,6 +384,30 @@
                   "path",
                   "sha256"
                 ]
+              },
+              "files": {
+                "type": "array",
+                "maxItems": 200,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+                      "maxLength": 255
+                    },
+                    "from": {
+                      "type": "string",
+                      "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$",
+                      "maxLength": 255
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "from"
+                  ]
+                }
               }
             },
             "required": [
@@ -614,10 +663,11 @@
                 "enum": [
                   "github",
                   "gitlab",
-                  "linear",
                   "slack",
                   "azure_devops",
-                  "coder"
+                  "coder",
+                  "jira",
+                  "tracker"
                 ]
               },
               "files": {
@@ -992,7 +1042,8 @@
                   "slack",
                   "schedule",
                   "webhook",
-                  "event"
+                  "event",
+                  "tracker"
                 ]
               },
               "workflow": {
@@ -1026,7 +1077,8 @@
                 "enum": [
                   "none",
                   "existing_task",
-                  "create_task"
+                  "create_task",
+                  "find_or_create_task"
                 ]
               },
               "subject_column": {
@@ -1054,6 +1106,13 @@
                   "slack_v0",
                   "hmac_sha256",
                   "shared_token"
+                ]
+              },
+              "aixle_changes": {
+                "enum": [
+                  "ignore",
+                  "other_workflows",
+                  "always"
                 ]
               }
             },
