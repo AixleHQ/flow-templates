@@ -8,3 +8,7 @@
   url: https://github.com/AixleHQ
   verified: true
   owners: [artempartos]
+- name: dualboot
+  display_name: Dualboot Partners
+  url: https://github.com/dualboot-partners
+  owners: [Alexandra-Kozhukhar]
