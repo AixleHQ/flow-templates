@@ -1,0 +1,12 @@
+# The resource keys a template.yaml declares are identifiers, but a long one
+# such as `key: b12_prd_validation` trips the generic-api-key entropy check.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Resource keys in template.yaml"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''templates/.+/template\.yaml$''']
+regexTarget = "line"
+regexes = ['''^\s*(?:-\s+)?key:\s*[a-z][a-z0-9_]*\s*$''']
