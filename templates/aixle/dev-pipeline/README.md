@@ -8,8 +8,8 @@ the diff, merge to staging and walk the acceptance criteria in a real browser.
 People make product decisions, run hand-run operations on staging, and merge
 when they want to.
 
-It is the pipeline Dualboot Partners runs on client and internal projects,
-merged from three live projects into one project-agnostic template.
+It is merged from three live delivery projects into one project-agnostic
+template.
 
 ## What you get
 
@@ -21,7 +21,7 @@ merged from three live projects into one project-agnostic template.
 - **12 agents** with distinct personas: planner, scope manager, intake triager,
   tech lead, UX designer, developer, code reviewer, release engineer,
   acceptance tester, progress reporter, unblock coordinator, card analyst.
-- **15 workflows**, 8 of them bound to columns:
+- **15 workflows**, 8 of them fired by a card entering a column:
 
 | Workflow | Fires on | What it does |
 |---|---|---|
@@ -34,9 +34,9 @@ merged from three live projects into one project-agnostic template.
 | Code Review | card enters Code Review | Adversarial static review: every acceptance criterion maps to a test; blocking findings go back. |
 | Merge and deploy to staging | card enters that column | Merges the branch into the staging branch, watches the deploy, proves the app answers, checks the spec for drift, hands over an `ops_runbook` when a person must act. |
 | Verify | card enters Verify | Walks every acceptance criterion and edge case in a headless browser against staging, compares screens with the design source, then merges the PR (or leaves it for a person) and closes the card. |
-| Blocked Sweep → After Deploy | manual | Classifies everything in Blocked and Human-gated and applies the moves you approve. |
-| Task Q&A | manual | Answers a question about a card from the code and the spec, read-only. |
-| Chat Intake | chat message containing `triage` | Turns a message into the right board action: an answer, a comment, an unblock, a bug card, a planning item. |
+| Blocked Sweep → After Deploy | manual (workflow run) | Classifies everything in Blocked and Human-gated and applies the moves you approve. |
+| Task Q&A | run button on a card in Backlog, Blocked, Human-gated or After Deploy | Answers a question about a card from the code and the spec, read-only. |
+| Chat Intake | chat message containing `triage` (a trigger you add once chat is connected) | Turns a message into the right board action: an answer, a comment, an unblock, a bug card, a planning item. |
 | Progress Report | schedule, twice a week | Evidence-based report for stakeholders: what shipped, how, what is blocked, what is left. |
 | Unblock Digest | schedule, weekdays | Works the Human-gated column: asks the open questions, validates answers, moves cards that are fully unblocked. |
 | Plan Bootstrap | manual, once | Derives epics, a story dependency graph and a sprint status file from your product spec. |
@@ -71,7 +71,7 @@ merged from three live projects into one project-agnostic template.
 | Who merges an accepted PR | `agent` | `human` keeps PRs open for review |
 | Product owner, delivery lead | generic | who agents name for decisions and escalations |
 | Product spec path, planning directory, design source | unset | optional: spec file, planning artefacts, UI contract |
-| Escalation channel, intake channel | unset | optional: Slack or Teams channel ids |
+| Escalation channel, intake channel | unset | optional: Slack or Teams channel ids; escalations go to the first, intake, reports and the unblock digest to the second |
 | UAT logins | unset | the test users Verify signs in as |
 
 Everything else is a config item you can change after installing. See
@@ -86,6 +86,8 @@ Everything else is a config item you can change after installing. See
   card, and deletes nothing.
 - The steps are written for Claude Code; other runtimes work but were not
   measured.
-- The template bundles no stack-specific skills. Attach your own (Rails,
-  Django, React, …) to Tech Design, Implementation and Code Review after
-  installing.
+- Chat is optional. The pipeline works on the board alone; connect Slack or
+  Teams when you want escalations, digests and Chat Intake in a channel.
+- The template bundles no skills and leaves BMAD off on every step. Attach your
+  own stack-specific skills (Rails, Django, React, …) to Tech Design,
+  Implementation and Code Review after installing.
