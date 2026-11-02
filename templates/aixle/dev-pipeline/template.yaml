@@ -1,5 +1,5 @@
 format_version: 1
-namespace: dualboot
+namespace: aixle
 slug: dev-pipeline
 version: 1
 name: Agentic Dev Pipeline
@@ -114,7 +114,7 @@ inputs:
   description: Login of an administrator test user on staging (its password is asked for after install).
 project:
   description: |-
-    Agentic delivery pipeline installed from the dualboot/dev-pipeline template. Cards flow Backlog → Tech Design → Design → Implementation → CI check → Code Review → Merge and deploy to staging → Verify → Done, with Blocked, Human-gated and After Deploy (Human action) to the side. See the Setup checklist for what to connect.
+    Agentic delivery pipeline installed from the aixle/dev-pipeline template. Cards flow Backlog → Tech Design → Design → Implementation → CI check → Code Review → Merge and deploy to staging → Verify → Done, with Blocked, Human-gated and After Deploy (Human action) to the side. See the Setup checklist for what to connect.
   preferred_artifacts_language: en
 board:
   name: Delivery
@@ -198,7 +198,7 @@ board:
   - key: human_gated
     name: Human-gated
     purpose: |-
-      Cards whose blocker is a human decision, a legal or policy ruling, a credential or an access grant — never code. **No automation fires on entry, and the Planner does not triage this column.** That is the point: kept in Blocked, every Planner cycle would re-derive the same verdict — *human-gated: nobody retries it* — and Blocked would stop meaning "the pipeline is stuck". The Client Unblock Digest works the decision cards here on its schedule: questions on the card, marked answers validated, a digest to the intake channel (`INTAKE_CHANNEL`) when it is set.
+      Cards whose blocker is a human decision, a legal or policy ruling, a credential or an access grant — never code. **No automation fires on entry, and the Planner does not triage this column.** That is the point: kept in Blocked, every Planner cycle would re-derive the same verdict — *human-gated: nobody retries it* — and Blocked would stop meaning "the pipeline is stuck". The Unblock Digest works the decision cards here on its schedule: questions on the card, marked answers validated, a digest to the intake channel (`INTAKE_CHANNEL`) when it is set.
 
       **What belongs here.** The third of Blocked's three triage kinds, split out: a missing product or scope decision (`{{inputs.product_owner}}`), a missing credential or access grant (`{{inputs.delivery_lead}}`), a permission the pipeline deliberately lacks, a legal or policy ruling, a *big* UI change with no design in the design source (tag `design-needed`), mockups drawn by Design awaiting a person's approval (tag `design-review`). Rule of thumb: if the answer would arrive from a person rather than from a merge, it goes here. Non-blocking follow-ups raised by any stage also land here, tagged `follow-up`, for an internal decision.
 
@@ -287,6 +287,7 @@ agents:
 - key: tech_lead
   name: tech_lead
   title: Tech Lead (Story & Design)
+  icon: 📐
   persona: |-
     You are a Tech Lead who prepares implementation-ready stories. Given a card, its spec (the product spec and planning artefacts when set, the tracker ticket when the title carries a key, otherwise the card description) and the surrounding codebase, you produce a self-contained story spec: clear acceptance criteria, the technical approach, the specific files/modules to touch, data/interface changes, edge cases, and a test plan. For a story with UI you find the matching screens in the design source (`DESIGN_SOURCE`) and write them into the spec as the UI contract, and you list the screens the source lacks for the Design stage to handle. Your output is precise enough that a developer agent can implement it without further questions.
   principles: |-
@@ -302,6 +303,7 @@ agents:
 - key: ux_designer
   name: ux_designer
   title: UX/UI Designer
+  icon: 🎨
   persona: |-
     You are a UX/UI designer working inside a design that already exists: the design source (`DESIGN_SOURCE`) — a design document, a design file or a deployed reference — and, when it is unset, the project's existing component library and current screens. Given a story that needs frontend design, you first establish whether its screens and states are already designed there, and only where they are not, you specify the missing ones so that nobody could tell they were added later — same components, layout grid, spacing, type scale, colours, copy tone and states as the screens around them. Your spec is precise enough that the developer can build the UI without guessing: user flow, screen/component breakdown, layout and states, interaction and responsive behaviour, and how it maps to the existing design system.
   principles: |-
@@ -318,6 +320,7 @@ agents:
 - key: developer
   name: developer
   title: Developer
+  icon: 🛠️
   persona: |-
     You are a senior software engineer who implements cards end to end in the project repository. You take a ready spec (the tracker ticket or the card description, plus the card's `tech_design` and `design` comments), implement it cleanly following the repository's existing architecture, patterns and the rules in `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md`, write/adjust tests, and get the change into version control via a branch and a pull request into `{{inputs.integration_branch}}`. You are meticulous about matching surrounding code and not breaking existing behavior.
   principles: |-
@@ -355,6 +358,7 @@ agents:
 - key: release_engineer
   name: release_engineer
   title: Release Engineer (Deploy)
+  icon: 🚀
   persona: |-
     You are a release/DevOps engineer who owns deployment to staging. A story reaches staging by merging its feature branch into `{{inputs.staging_branch}}` and pushing; the `STAGING_DEPLOY_WORKFLOW` run then builds, migrates and deploys. You perform that merge, watch the run (`gh run list --branch {{inputs.staging_branch}}` / `gh run watch`), and verify the running service at `STAGING_BASE_URL`: the run is green for the pushed sha, `HEALTH_PATH` answers, the story's own route responds, and the project's error tracker (if one is configured) shows no new errors. Hand-run operations and infrastructure go to a person as a runbook, never run by you. You never touch `main` / the production branch, `{{inputs.integration_branch}}` directly, or release branches — production is released only by a human. You know exactly where your authority ends: anything requiring a human-held secret or access you cannot obtain, you escalate rather than guess.
   principles: |-
@@ -372,7 +376,7 @@ agents:
 - key: uat_tester
   name: uat_tester
   title: Acceptance Tester (UAT)
-  icon: eye
+  icon: 👁️
   persona: |-
     You are a user acceptance tester. You do not read diffs and you do not run test suites — those stages already happened. You open a real browser against the deployed staging application (`STAGING_BASE_URL`, logging in with the `UAT_*` test accounts) and walk the acceptance criteria of the card's spec (the tracker ticket when the title carries a key, otherwise the card description) the way the person the story was written for would: you click, you type, you read what is on the screen, and you say whether the promised thing actually happened.
 
@@ -411,13 +415,14 @@ agents:
     - The report is posted to the intake channel (`INTAKE_CHANNEL`) when it is set and attached to the board either way. You read the repository; you never write to it.
   communication_style: |-
     Plain and declarative. Short paragraphs, concrete nouns, numbers with their basis attached. Leads with what changed, follows with what it means, ends with what needs a decision. No exclamation marks, no "excited to share", no filler adjectives.
-- key: client_unblock_coordinator
-  name: client_unblock_coordinator
+- key: unblock_coordinator
+  name: unblock_coordinator
   title: Unblock Coordinator
+  icon: 🔓
   persona: |-
     You are the Unblock Coordinator. Each run you work only the Human-gated column: cards whose blocker includes a human decision — product, scope, legal, policy — that `{{inputs.product_owner}}` or `{{inputs.delivery_lead}}` has to make. You read every card's full history fresh — comments, tags, transitions, sessions — never assume yesterday's state still holds.
 
-    You write in clear English for a business audience. Questions go on the card as `client_question` comments; validation results as `unblock_validation`. A digest goes to the intake channel (`INTAKE_CHANNEL`) when it is set, addressed to `{{inputs.product_owner}}` and `{{inputs.delivery_lead}}`; otherwise the digest stays on the board.
+    You write in clear English for a business audience. Questions go on the card as `owner_question` comments; validation results as `unblock_validation`. A digest goes to the intake channel (`INTAKE_CHANNEL`) when it is set, addressed to `{{inputs.product_owner}}` and `{{inputs.delivery_lead}}`; otherwise the digest stays on the board.
 
     You are conservative about moving cards. Entry into Tech Design fires automation immediately, so you move only when every blocker is cleared and the card is complete enough to act on. A valid decision with credentials still missing stays in Human-gated.
   principles: |-
@@ -433,6 +438,7 @@ agents:
 - key: card_analyst
   name: card_analyst
   title: Card Analyst (Read-only)
+  icon: 💬
   persona: |-
     A read-only board analyst. Answers questions about cards by verifying their claims against the spec (the tracker ticket when the title carries a key, otherwise the card description) and the code on `{{inputs.integration_branch}}` rather than repeating what the card says. Names the real blocker in the board's own triage vocabulary — work-gated, human-gated, retryable, or unstarted — and says plainly when it could not verify something. Never moves, edits or releases a card.
   communication_style: Briefing first, then answers. States what was verified and how.
@@ -442,7 +448,7 @@ mcp_servers:
     name: Playwright
     description: Headless browser for Verify and Design checks against staging
     transport: stdio
-    command: npx @playwright/mcp --headless --browser chromium --no-sandbox --ignore-https-errors
+    command: npx @playwright/mcp@0.0.83 --headless --browser chromium --no-sandbox --ignore-https-errors
     auth_type: none
 - key: context7
   custom:
@@ -1070,6 +1076,7 @@ workflows:
     - CI_CHECK_NAME
     - STAGING_DEPLOY_WORKFLOW
     - STAGING_BASE_URL
+    - DESIGN_SOURCE
     on_failure: fail
     skip_policy: never
     max_retries: 0
@@ -1381,6 +1388,7 @@ workflows:
     - CI_CHECK_NAME
     - PR_MERGE_POLICY
     - ESCALATION_CHANNEL
+    - DESIGN_SOURCE
     on_failure: fail
     skip_policy: never
     max_retries: 0
@@ -1526,11 +1534,16 @@ workflows:
     - PLANNING_DIR
     - DESIGN_SOURCE
     - ESCALATION_CHANNEL
+    - STAGING_BASE_URL
+    - PR_MERGE_POLICY
+    - INTAKE_CHANNEL
+    - UAT_LOGIN
+    - UAT_ADMIN_LOGIN
     on_failure: fail
     skip_policy: never
     max_retries: 0
     allow_non_interactive: true
-    bmad_enabled: true
+    bmad_enabled: false
     sub_steps:
     - name: 'Design source screens: map the story to the design source'
       instructions: |-
@@ -1683,12 +1696,18 @@ workflows:
     config_items:
     - SPEC_PATH
     - DESIGN_SOURCE
+    - STAGING_BASE_URL
+    - UAT_LOGIN
+    - UAT_PASSWORD
+    - UAT_ADMIN_LOGIN
+    - UAT_ADMIN_PASSWORD
     - ESCALATION_CHANNEL
+    - PLANNING_DIR
     on_failure: fail
     skip_policy: never
     max_retries: 0
     allow_non_interactive: true
-    bmad_enabled: true
+    bmad_enabled: false
     sub_steps:
     - name: Read the card, the tech design and any `design_feedback` / `design_approved`
       instructions: |-
@@ -1755,6 +1774,7 @@ workflows:
     config_items:
     - DESIGN_SOURCE
     - ESCALATION_CHANNEL
+    - INTAKE_CHANNEL
     depends_on:
     - produce_ui_spec
     on_failure: fail
@@ -1979,11 +1999,13 @@ workflows:
     - PR_MERGE_POLICY
     - STAGING_BASE_URL
     - ESCALATION_CHANNEL
+    - STAGING_DEPLOY_WORKFLOW
+    - INTAKE_CHANNEL
     on_failure: fail
     skip_policy: never
     max_retries: 0
     allow_non_interactive: true
-    bmad_enabled: true
+    bmad_enabled: false
     sub_steps:
     - name: Post the `branch` comment
       instructions: |-
@@ -2113,10 +2135,9 @@ workflows:
     - board_manage_tags
     - board_create_task
     - board_list_gates
-    - chat_post_message
     config_items:
     - CI_CHECK_NAME
-    - ESCALATION_CHANNEL
+    - PR_MERGE_POLICY
     on_failure: fail
     skip_policy: never
     max_retries: 0
@@ -2227,11 +2248,14 @@ workflows:
     - DESIGN_SOURCE
     - CI_CHECK_NAME
     - ESCALATION_CHANNEL
+    - PLANNING_DIR
+    - PR_MERGE_POLICY
+    - INTAKE_CHANNEL
     on_failure: fail
     skip_policy: never
     max_retries: 0
     allow_non_interactive: true
-    bmad_enabled: true
+    bmad_enabled: false
     sub_steps:
     - name: Repo-rules check on the diff (CLAUDE.md / AGENTS.md / CONTRIBUTING.md)
       instructions: |-
@@ -2392,6 +2416,9 @@ workflows:
     - CI_CHECK_NAME
     - SPEC_PATH
     - ESCALATION_CHANNEL
+    - PLANNING_DIR
+    - PR_MERGE_POLICY
+    - INTAKE_CHANNEL
     on_failure: fail
     skip_policy: never
     max_retries: 0
@@ -2680,6 +2707,9 @@ workflows:
   name: Blocked Sweep → After Deploy
   description: |-
     Manual, human-started, unbound. Sweeps every non-archived card in Blocked and Human-gated and classifies it: needs a hand-run step on staging (→ After Deploy (Human action) with an `ops_runbook`), blocked only by the staging deploy (→ Verify / After Deploy if already live on staging, else Merge and deploy to staging), blocker already cleared with a citation (→ the column it was blocked in, or Backlog if never started), misfiled (engineering work parked in Human-gated or a procure-and-configure card → Backlog; a person-gated card in Blocked → Human-gated), or still blocked (retryable / work-gated / human-gated — untouched, blocker named). Without an input asset it only reports; run it again with the reviewed report attached as `sweep-approved.md` to apply exactly the rows in that file.
+  base:
+    repositories:
+    - app
   steps:
   - key: classify_and_apply_moves
     name: Classify Blocked & Human-gated, then apply the approved moves
@@ -2739,6 +2769,9 @@ workflows:
     - session_log
     - chat_post_message
     config_items:
+    - STAGING_DEPLOY_WORKFLOW
+    - STAGING_BASE_URL
+    - PLANNING_DIR
     - ESCALATION_CHANNEL
     on_failure: fail
     skip_policy: never
@@ -2748,7 +2781,7 @@ workflows:
 - key: task_qa
   name: Task Q&A
   description: |-
-    Manual only — an "Ask about this card" button on the columns that have no automation (Backlog, Blocked, Human-gated, After Deploy (Human action)). Opens an interactive session on one card: reads the card, its tracker ticket when the title carries a key, its comments, its gates and its assets, then verifies every claim against the spec hierarchy and the code on `{{inputs.integration_branch}}` before answering. Answers what the card is, what is actually missing, and which of the board's blocker kinds applies — work-gated, human-gated, retryable, or simply unstarted. Read-only: it never moves a card, never edits one, and never releases work. Leaves a `question_answer` comment only when asked.
+    Manual only — a manual column trigger (a run button on the card) on each column that has no automation (Backlog, Blocked, Human-gated, After Deploy (Human action)). Opens an interactive session on one card: reads the card, its tracker ticket when the title carries a key, its comments, its gates and its assets, then verifies every claim against the spec hierarchy and the code on `{{inputs.integration_branch}}` before answering. Answers what the card is, what is actually missing, and which of the board's blocker kinds applies — work-gated, human-gated, retryable, or simply unstarted. Read-only: it never moves a card, never edits one, and never releases work. Leaves a `question_answer` comment only when asked.
   base:
     repositories:
     - app
@@ -3005,6 +3038,7 @@ workflows:
     - PR_MERGE_POLICY
     - INTAKE_CHANNEL
     - ESCALATION_CHANNEL
+    - DESIGN_SOURCE
     on_failure: fail
     skip_policy: never
     max_retries: 0
@@ -3040,7 +3074,7 @@ workflows:
 
       ## Writing for the stakeholders
 
-      - Plain product language. No internal column names ("Human-gated", "After Deploy"), no agent, workflow or pipeline vocabulary, no commands. Name the feature and the screen ("the registration form's fee line", "the list's top strip"), not the card: a card id, tracker key or PR link may follow a line in brackets, but the line must stand without it — {{inputs.product_owner}} may not open the board, and a bare number means nothing to a reader who cannot.
+      - Plain product language. No internal column names ("Human-gated", "After Deploy"), no agent, workflow or pipeline vocabulary, no commands. Name the feature and the screen ("the checkout page's total line", "the list's top strip"), not the card: a card id, tracker key or PR link may follow a line in brackets, but the line must stand without it — {{inputs.product_owner}} may not open the board, and a bare number means nothing to a reader who cannot.
       - Describe how a thing works today and what we are adding, as the plan it is. Never write "gap", "known issue", "deferred", "blind spot", "bug count" or defect statistics. A problem that stops progress is named as *what we need* and *from whom*, not as a fault.
       - No effort or duration estimates, ever. Dates come only from an agreed plan — the spec at `SPEC_PATH` or the planning artefacts in `PLANNING_DIR` — never from your own forecast.
       - "Needs a decision or an action" lists, first, what {{inputs.product_owner}} owes (decisions) and what {{inputs.delivery_lead}} owes (access, credentials, accounts, documents), each with the date it was first asked; then what the team is doing about anything else that blocks progress.
@@ -3101,7 +3135,7 @@ workflows:
       4. `*Progress:*` the completion figure with its method in five words.
       5. `*Remaining:*` one line of counts: "N of <total> stories left — X in progress, Y waiting on a person, Z not started". Counts only: no dates, durations or forecasts.
       6. `*Questions for you:*` a **numbered list**, one question per line, every open question to {{inputs.product_owner}} (none → omit the block). Each line must make sense to someone who cannot open the board and has read no earlier report:
-         - the question itself, in plain words, answerable with a short reply (e.g. "Which fee should the registration form show: the partner-specific rate or the standard one?"), not a topic ("Fee wording");
+         - the question itself, in plain words, answerable with a short reply (e.g. "Which price should the checkout page show: the discounted one or the list price?"), not a topic ("Fee wording");
          - in brackets, what the answer unlocks, in product terms, and the date it was first asked: "(unlocks the fee disclosure · asked <Mon D>)" — examples of the form only, never questions to copy;
          - a request for an account, a document or access is written as the action and addressed to {{inputs.delivery_lead}}: "Add the sandbox API key as a config item".
          Sources: cards whose latest `owner_question` comment has no later comment tagged `decision`, plus Blocked and Human-gated cards waiting on {{inputs.product_owner}}. Merge duplicates into one question; never include internal follow-up decisions (cards tagged `follow-up` or `needs-human-decision` without an `owner_question`) — those are the team's, not the product owner's. Order by what unblocks the most work first. More than 8 → list the 8 that unblock the most and end with "+ N more in the attached report", where the HTML lists all of them.
@@ -3130,6 +3164,9 @@ workflows:
     - STAGING_BASE_URL
     - STAGING_DEPLOY_WORKFLOW
     - INTAKE_CHANNEL
+    - HEALTH_PATH
+    - DESIGN_SOURCE
+    - PR_MERGE_POLICY
     on_failure: fail
     skip_policy: never
     max_retries: 0
@@ -3138,7 +3175,7 @@ workflows:
 - key: unblock_digest
   name: Unblock Digest
   description: |-
-    Scheduled daily, unbound. Works only the Human-gated column: re-reads every non-archived card's full history, checks whether the blocker was already answered (sibling cards, the spec at `SPEC_PATH`, shipped code) and cites it, posts or updates `owner_question` comments — decisions for {{inputs.product_owner}}, access and credentials for {{inputs.delivery_lead}} — validates only answers explicitly marked as such (tagged `decision`) in `unblock_validation` comments, reconciles the description, and routes a card to Backlog or Done only when every blocker is cleared. Delivers one digest, grouped by owner and oldest first, to the escalation channel (`ESCALATION_CHANNEL`) when set, otherwise as comments on the cards. Read-only on the repository.
+    Scheduled daily, unbound. Works only the Human-gated column: re-reads every non-archived card's full history, checks whether the blocker was already answered (sibling cards, the spec at `SPEC_PATH`, shipped code) and cites it, posts or updates `owner_question` comments — decisions for {{inputs.product_owner}}, access and credentials for {{inputs.delivery_lead}} — validates only answers explicitly marked as such (tagged `decision`) in `unblock_validation` comments, reconciles the description, and routes a card to Backlog or Done only when every blocker is cleared. Delivers one digest, grouped by owner and oldest first, to the intake channel (`INTAKE_CHANNEL`) when set, otherwise as comments on the cards. Read-only on the repository.
   base:
     repositories:
     - app
@@ -3148,7 +3185,7 @@ workflows:
     instructions: |-
       ## Task
 
-      One daily cycle: scan **Human-gated** only, work the cards blocked on a **person's decision or access**, check whether the answer already exists, post or update questions on the card, validate explicitly marked answers, route a card only when **every** blocker is gone, and deliver one short digest — to the escalation channel (`ESCALATION_CHANNEL`) when it is set, otherwise as comments on the board. **Read-only on the repository.**
+      One daily cycle: scan **Human-gated** only, work the cards blocked on a **person's decision or access**, check whether the answer already exists, post or update questions on the card, validate explicitly marked answers, route a card only when **every** blocker is gone, and deliver one short digest — to the intake channel (`INTAKE_CHANNEL`) when it is set, otherwise as comments on the board. **Read-only on the repository.**
 
       Re-read each card from scratch every run. Comments, tags, column transitions and sessions (`session_list`, `session_log`) are the source of truth; do not carry state between runs.
 
@@ -3270,8 +3307,8 @@ workflows:
 
       Quiet day → one line: no in-scope cards, or nothing changed.
 
-      **Delivery.** `ESCALATION_CHANNEL` set → post the digest once with `chat_post_message`, one message, and nowhere else. Unset → no chat: leave a short digest comment (its *Still waiting*, *Questions posted* or *Released* line) on each card the cycle touched or found still waiting, at most one per card per run, and do not report "message not sent" as a finding. Either way, save the same digest body to `/workspace/outputs/unblock-digest.md`. An answer given in chat does not reach a card by itself: it reaches the board through Chat Intake (a message containing `triage` naming the card) or by a person posting it on the card — say so in the digest when asking.
-    agent: client_unblock_coordinator
+      **Delivery.** `INTAKE_CHANNEL` set → post the digest once with `chat_post_message`, one message, and nowhere else. Unset → no chat: leave a short digest comment (its *Still waiting*, *Questions posted* or *Released* line) on each card the cycle touched or found still waiting, at most one per card per run, and do not report "message not sent" as a finding. Either way, save the same digest body to `/workspace/outputs/unblock-digest.md`. An answer given in chat does not reach a card by itself: it reaches the board through Chat Intake (a message containing `triage` naming the card) or by a person posting it on the card — say so in the digest when asking.
+    agent: unblock_coordinator
     tools:
     - board_get_board_info
     - board_list_tasks
@@ -3288,7 +3325,8 @@ workflows:
     - session_log
     config_items:
     - SPEC_PATH
-    - ESCALATION_CHANNEL
+    - INTAKE_CHANNEL
+    - PLANNING_DIR
     on_failure: fail
     skip_policy: never
     max_retries: 0
@@ -3325,7 +3363,7 @@ workflows:
       required: false
     - name: Deliver the digest
       instructions: |-
-        One digest, grouped by owner, oldest first, including "Assumptions taken in the last 24 hours". `ESCALATION_CHANNEL` set → one `chat_post_message`; unset → one comment per touched card. Save the same body to `/workspace/outputs/unblock-digest.md`.
+        One digest, grouped by owner, oldest first, including "Assumptions taken in the last 24 hours". `INTAKE_CHANNEL` set → one `chat_post_message`; unset → one comment per touched card. Save the same body to `/workspace/outputs/unblock-digest.md`.
       required: true
 - key: plan_bootstrap
   name: Plan Bootstrap
@@ -3487,18 +3525,22 @@ triggers:
   timezone: UTC
   cooldown_seconds: 0
   status_reporting: failures
-- kind: chat
-  workflow: chat_intake
-  name: Chat intake on `triage`
-  trigger_mode: auto
-  subject_policy: none
-  chat_provider: slack
-  filter_predicate:
-    text:
-      op: contains
-      value: triage
-  cooldown_seconds: 0
-  status_reporting: lifecycle
+- kind: column
+  workflow: task_qa
+  column: backlog
+  trigger_mode: manual
+- kind: column
+  workflow: task_qa
+  column: blocked
+  trigger_mode: manual
+- kind: column
+  workflow: task_qa
+  column: human_gated
+  trigger_mode: manual
+- kind: column
+  workflow: task_qa
+  column: after_deploy
+  trigger_mode: manual
 variables:
 - name: STAGING_BASE_URL
   value: '{{inputs.staging_base_url}}'
@@ -3549,7 +3591,6 @@ variables:
 requires:
   integrations:
   - github
-  - slack
   repositories:
   - key: app
     purpose: |-
