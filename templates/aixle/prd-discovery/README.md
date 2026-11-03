@@ -22,7 +22,7 @@ select and from your answers.
 | File | What it is |
 |---|---|
 | `source-digest.md` | Every source, the facts it states, contradictions, what could not be read |
-| `track.md` | Run passport: project type, document language, Figma on or off, product folder |
+| `track.md` | Run passport: project type, document language, Figma on or off, product folder, decision owner |
 | `design-tree.md` | Every decision, settled (with its source) or open |
 | `grill-log.md` | Each question, the answer, and who decided it (you, or your acceptance of the agent's recommendation) |
 | `open-questions.md` | Open decisions and evidence gaps, each with who can close it |
@@ -66,9 +66,20 @@ recommendation.
 
 High-impact items are re-asked as a choice: **A** (I decide this now) or **B**
 (open for the named owner). High-impact means pricing, legal, safety or
-compliance, scope changes, reversing an earlier decision, and anything a client or
-stakeholder owns. Reply with letters, for example "Q2 A, Q7 B". Items answered B
-stay open, with their owner, in the open questions or the question register.
+compliance, scope changes, reversing an earlier decision, and anything the decision
+owner or another named person owns. Reply with letters, for example "Q2 A, Q7 B".
+Items answered B stay open, with their owner, in the open questions or the question
+register.
+
+Step 00 lists the **sensitive topics** in your material (health, distress or crisis,
+safety, legal, privacy, compliance) and every item of any open-items list, even when
+the material decides nothing about them. Each of them is asked as an A/B choice
+later, so none can drop out of the PRD silently. In PRD Full Discovery, what you
+decided or left open in the brief is carried into the PRD without asking again.
+
+The **decision owner** is the person whose written confirmation makes a decision
+final: a client, a founder or a product owner. Step 00 asks who it is. Only that
+person's written confirmation marks anything as Confirmed.
 
 ### Choosing the optional steps (PRD Full Discovery)
 
@@ -76,29 +87,26 @@ Step 00 lists the optional steps with a run or skip recommendation for your
 product. Reply with the ones to drop (for example "drop 3, 8, 10"), "keep all", or
 "as recommended". Dropped steps are skipped automatically, with no session. Each
 kept step asks "run or skip?" once more when it comes up. Steps B09 (brief), B11
-(PRD), B12 (validation) and B15 (epics and stories) always run.
+(PRD), B12 (validation), B15 (epics and stories) and B17 (save) always run.
+
+The workflow skips steps with small marker files (`step-<ID>.done`) in the run.
+Each optional step writes its marker first thing, so pressing Finish session early
+does not fail the step. A marker that still says `started` means the step was not
+finished.
 
 ## Saving the results to the project
 
-Every file a run writes stays on the run page (**Assets** tab), where you can
-download it. To keep files in the project's Assets for later runs:
+The last step of each workflow, **Save to project** (`S` in PRD Fast, `B17` in PRD
+Full Discovery), saves every document of the run into your product folder in the
+project's Assets. It asks nothing: type "go", let it report what it saved, and
+press **Finish session**. In PRD Full Discovery it saves the validated `prd.md`
+from B12 and skips the `step-*.done` marker files.
 
-**PRD Fast (grill-me).** At the end of the last step, F3 saves `prd.md` into your
-product folder. Then, on the run page, open the **Assets** tab, press
-**Promote all to project**, and enter **the same product folder name** in the
-Folder field. The agent tells you the name. A different name creates a second
-folder.
+You do not need **Promote all** on the run page. If you use it anyway, enter the
+same product folder name, and expect it to also copy the marker files and both
+copies of `prd.md` (the draft from B11 and the validated one from B12).
 
-**PRD Full Discovery.** Step B15 saves every earlier document into your product
-folder by itself, including the validated `prd.md` from B12. If the readiness check
-(B16) runs, it also saves `epics.md` and `prd-decisions.md`. Otherwise, on the run
-page, press **Promote** next to `epics.md` and the newest `prd-decisions.md`, and
-enter **the same product folder name** in the Folder field. The agent tells you
-the name. A different name creates a second folder.
-
-**Do not use Promote all for PRD Full Discovery.** It would also copy the 16
-`step-*.done` marker files the workflow uses to skip steps, and both copies of
-`prd.md` (the draft from B11 and the validated one from B12).
+Every file also stays on the run page (**Assets** tab), where you can download it.
 
 ## Good to know
 
