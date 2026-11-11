@@ -1,7 +1,7 @@
 format_version: 1
 namespace: aixle
 slug: dev-pipeline
-version: 1
+version: 2
 name: Agentic Dev Pipeline
 summary: |-
   A Kanban delivery pipeline run by agents: a Planner releases independent cards under a WIP cap; agents write the tech design and UI spec, implement on a branch, gate on CI, review the diff, merge to staging and verify in a real browser; people decide, run hand-run ops and unblock.
@@ -677,12 +677,17 @@ workflows:
 
       **The pairwise tests are what bound the batch, not the cap.** Disjointness is quadratic: a batch of
       *n* candidates is *n(n−1)/2* pairs to check, and one unchecked pair puts two cards on the same files.
-      Check them all, in rank order, and stop adding when the next candidate collides — a batch of 4 that is
-      genuinely disjoint beats a full batch that is not. Shared generated files (lockfiles, generated
+      Check them all, in rank order. Shared generated files (lockfiles, generated
       catalogues, generated API clients) are a collision unless the repository's docs say the file merges
       cleanly per section — then the footprint is the section, and name the section each card owns.
 
-      **Respect the {{inputs.wip_cap}}-card cap.** Count what already sits in Tech Design → Verify first;
+      **One pool, fill every free slot.** The Backlog cards, the graph frontier and the off-graph stories are **one candidate pool**, not a ladder you climb only when a rung is empty — the frontier is never empty, so a ladder never reaches Backlog. Rank the whole pool by § B.2, walk it in rank order and test each candidate against what is in flight, After Deploy, and what you have already picked; **a collision skips that candidate, it never ends the cycle.** Stop when the free slots are filled or the **candidate budget** is spent: test at most the free slots + 10 candidates, in rank order, and derive footprints only for those. Stopping with free slots left is allowed when the budget is spent — say so in the report — or with each refused candidate named in the report with the exact card and file it collided with, or the eligibility rule it failed. Within the budget, "not read" or "not checked" is never a reason for a refusal. Free slots are still a ceiling, never a quota: a colliding or ineligible card is never released to fill one.
+
+      **A footprint is a list of files, not an area.** Two cards collide only when both would edit the **same file** — or, for a shared generated file the repository's docs say merges cleanly per section, the same section. "The billing module", "the API package", "the background workers" are areas, not footprints: never refuse a candidate on an area label. Take each side's file list from the `paths:` line, the footprint in the description, or the branch diff. For a candidate with none, derive it from its spec and the code — the controllers, models, services, jobs, pages, components, migrations and tests it would edit — at file level, at worst one directory deep. Files both sides only read or only call are not a collision. A refusal names the shared file(s) and the card holding them.
+
+      **Archived cards are not on the board.** Depending on the Flow version, `board_list_tasks` either hides archived cards or returns them with `archived: true`. Drop every row with `archived: true`, if any appear, **before anything else** — the cap count, footprint collisions, Backlog candidates, the Blocked scan and stuck-card re-triggers. An archived card holds no slot, has no live footprint and is never released, re-triggered or watchdogged. Two exceptions. **Duplicate checks (§ B.0) include archived cards:** list with `include_archived: true` — a person archived that card to say "not doing this", so an archived card for the same work blocks creating or releasing it again; create nothing and name the archived card in the report. **Dependencies:** a dependency whose card was archived from **Done** is satisfied — when a dependency's card is missing from the list, look it up with `board_list_tasks` and `include_archived: true` before calling it unresolved.
+
+      **Respect the {{inputs.wip_cap}}-card cap.** Archived cards never count. Count what already sits in Tech Design → Verify first;
       release only up to the difference. A full pipeline means release nothing, however eligible the queue
       looks. Cards in **Blocked**, **Human-gated** and **After Deploy (Human action)** hold no slot. After
       Deploy cards still count for footprint collisions (above).
@@ -768,8 +773,8 @@ workflows:
       board is what marks a story as released**.
 
       A **frontier story** is one whose status is `backlog` (or that has no key yet), every graph ancestor
-      `done` transitively (a card in Done counts — § A), with **no card for the story in any column and no
-      open PR for it (§ B.0)**, and with no `Gated by:` line naming a question still open in the spec's
+      `done` transitively (a card in Done counts — § A), with **no card for the story in any column — archived
+      cards included — and no open PR for it (§ B.0)**, and with no `Gated by:` line naming a question still open in the spec's
       recorded open questions (list those under Skipped). For each frontier story you intend to release this
       cycle, read its text in `epics.md` (the spec at `SPEC_PATH` only when that is not enough), compute its
       footprint, and **create its card in Backlog per § C** — title `<story-id> <title>`, tag
@@ -800,6 +805,9 @@ workflows:
       1. List the tasks of **every** column: Backlog, Needs Planning, Tech Design → Verify, After Deploy
          (Human action), Blocked, **Human-gated** and Done. "You do not triage Human-gated" means you never
          move it or comment on it. It does **not** mean you skip it when looking for an existing card.
+         List with `include_archived: true`: an **archived** card for the same work counts too — a person
+         archived it to say "not doing this" — so create and release nothing for that work and name the
+         archived card under § G.3.
       2. **The work's card** is one whose title contains the same tracker key `<KEY>` (a title like
          `<KEY> follow-up: …` is a different card) or carries the tag `<KEY>`; or, for a story, one whose
          title starts with `<story-id> ` (the id and then a space; `<story-id> follow-up: …` is a different
@@ -829,8 +837,7 @@ workflows:
 
       **Skip an agent that is failing.** Agent subscriptions and logins change, so no member is permanently
       good or bad. Before assigning, look at the latest workflow runs of cards assigned to each member
-      (`session_list`, then `session_log` for the error message). A member whose latest runs failed with
-      "Quota exceeded" or "login has expired" is skipped in the rotation until a later run of theirs
+      (`session_list`, then `session_log` for the error message). A member whose latest run shows one of these signs — "Quota exceeded", "login has expired", "no output for 30 minutes" / a spend-limit dialog, or a run cancelled with 0 steps (an ordinary cancel after steps ran does not count) — is skipped in the rotation until a later run of theirs
       succeeds. If every member is failing, assign by the rotation anyway and say so in your report.
 
       **`board_create_task` targets Backlog.** Entry into an automated column fires that workflow
@@ -874,7 +881,7 @@ workflows:
       | What you need | Where to read it |
       |---|---|
       | **Footprint** of a card in flight or in After Deploy | its `branch` comment's `paths:` line, else the footprint in its description, else compute it from the branch diff against `{{inputs.integration_branch}}` — and say in the report that you computed it |
-      | **Footprint** of a candidate | its description, else its tracker ticket, epic text and `tech_design` comment if any, else the repository layout and the files the spec names — say it was computed |
+      | **Footprint** of a candidate | its description, else its tracker ticket, epic text and `tech_design` comment if any, else derive a file list from its spec and the code — at file level, at worst one directory deep, never a bare package or top-level directory — say it was computed |
       | **Retry count** for a stuck card | count your own `watchdog`-tagged comments on that card. Two already there → the next move is Blocked, not a third bounce |
       | **Escalation age** | the timestamp of your last escalation comment on that card |
       | **After Deploy wait** | the timestamp of the card's latest `ops_runbook` comment |
@@ -1093,17 +1100,21 @@ workflows:
       required: true
     - name: Count work in flight against the cap
       instructions: |-
-        Count cards sitting in Tech Design → Verify. **Cards in After Deploy (Human action), Blocked and Human-gated hold no slot** — they wait on a person — but After Deploy cards' footprints still count for every collision check (their PR into `{{inputs.integration_branch}}` is still open). Release only up to the difference from the **{{inputs.wip_cap}}-card cap** — both the ceiling on work in flight and the most you may release in one cycle. A full pipeline means release nothing. **Free slots are a ceiling, never a quota:** never pad a batch. The board is ground truth: a mismatch between the board, the tracker, `sprint-status.yaml` and open PRs is drift to report, never to fix.
+        Drop any row with `archived: true` first — an archived card holds no slot. Count cards sitting in Tech Design → Verify. **Cards in After Deploy (Human action), Blocked and Human-gated hold no slot** — they wait on a person — but After Deploy cards' footprints still count for every collision check (their PR into `{{inputs.integration_branch}}` is still open). Release only up to the difference from the **{{inputs.wip_cap}}-card cap** — both the ceiling on work in flight and the most you may release in one cycle. A full pipeline means release nothing. **Free slots are a ceiling, never a quota:** never pad a batch. The board is ground truth: a mismatch between the board, the tracker, `sprint-status.yaml` and open PRs is drift to report, never to fix.
       required: true
     - name: Select the independent batch
       instructions: |-
-        Candidates: **Backlog cards**, plus — when `PLANNING_DIR` is set — **frontier stories** (status `backlog` or no key, every graph ancestor done, no card anywhere, no open PR, no `Gated by:` an open question) and off-graph stories in `epics.md` (no status key, no graph node; report them as off-graph). Each needs every dependency satisfied and an actionable spec; leave alone a card younger than one cycle (check `session_list`), one with a `needs-human` / `blocked` / pending-`credentials` marker, a stub, or a scope-shaped card. Read each Backlog card's latest `decision` comment: a settled decision outranks a stale description — reconcile it (`## Decision — <date> (comments <ids>)` on top, stale text under `## Superseded (kept for history)`, delete nothing) before moving. Procure-and-configure cards stay in Backlog until their access exists.
+        Drop any row with `archived: true` first. Candidates: **Backlog cards**, plus — when `PLANNING_DIR` is set — **frontier stories** (status `backlog` or no key, every graph ancestor done, no card anywhere, no open PR, no `Gated by:` an open question) and off-graph stories in `epics.md` (no status key, no graph node; report them as off-graph). Each needs every dependency satisfied and an actionable spec; leave alone a card younger than one cycle (check `session_list`), one with a `needs-human` / `blocked` / pending-`credentials` marker, a stub, or a scope-shaped card. Read each Backlog card's latest `decision` comment: a settled decision outranks a stale description — reconcile it (`## Decision — <date> (comments <ids>)` on top, stale text under `## Superseded (kept for history)`, delete nothing) before moving. Procure-and-configure cards stay in Backlog until their access exists.
 
-        Pick up to the free slots with no dependency path between any two, pairwise disjoint footprints, and no collision with anything in flight **or in After Deploy (Human action)**. **The pairwise tests bound the batch, not the cap** — *n* candidates are *n(n−1)/2* pairs; check them in rank order and stop when the next collides. Rank by what a card unblocks (§ B.2): Blocked cards it frees (work-gated, base-red), then transitive dependants, then pending work assuming it; ties → priority, `bug`, keystone / critical path / wave when the graph has them, oldest. Say whether each count was counted or estimated. Release only into **Tech Design**. **Never take from Needs Planning, Human-gated or After Deploy (Human action).** Nothing eligible → release nothing, one line.
+        Pick up to the free slots with no dependency path between any two, pairwise disjoint footprints, and no collision with anything in flight **or in After Deploy (Human action)**. **The pairwise tests bound the batch, not the cap** — *n* candidates are *n(n−1)/2* pairs; check them in rank order. Rank by what a card unblocks (§ B.2): Blocked cards it frees (work-gated, base-red), then transitive dependants, then pending work assuming it; ties → priority, `bug`, keystone / critical path / wave when the graph has them, oldest. Say whether each count was counted or estimated. Release only into **Tech Design**. **Never take from Needs Planning, Human-gated or After Deploy (Human action).** Nothing eligible → release nothing, one line.
+
+        **One pool, fill every free slot.** The Backlog cards, the graph frontier and the off-graph stories are **one candidate pool**, not a ladder you climb only when a rung is empty — the frontier is never empty, so a ladder never reaches Backlog. Rank the whole pool by § B.2, walk it in rank order and test each candidate against what is in flight, After Deploy, and what you have already picked; **a collision skips that candidate, it never ends the cycle.** Stop when the free slots are filled or the **candidate budget** is spent: test at most the free slots + 10 candidates, in rank order, and derive footprints only for those. Stopping with free slots left is allowed when the budget is spent — say so in the report — or with each refused candidate named in the report with the exact card and file it collided with, or the eligibility rule it failed. Within the budget, "not read" or "not checked" is never a reason for a refusal. Free slots are still a ceiling, never a quota: a colliding or ineligible card is never released to fill one.
+
+        **A footprint is a list of files, not an area.** Two cards collide only when both would edit the **same file** — or, for a shared generated file the repository's docs say merges cleanly per section, the same section. "The billing module", "the API package", "the background workers" are areas, not footprints: never refuse a candidate on an area label. Take each side's file list from the `paths:` line, the footprint in the description, or the branch diff. For a candidate with none, derive it from its spec and the code — the controllers, models, services, jobs, pages, components, migrations and tests it would edit — at file level, at worst one directory deep. Files both sides only read or only call are not a collision. A refusal names the shared file(s) and the card holding them.
       required: true
     - name: 'One piece of work, one card: search every column before creating or releasing'
       instructions: |-
-        For every card you are about to create or release, list the tasks of every column, including Human-gated, Blocked, Needs Planning, After Deploy (Human action) and Done. Another card whose title contains the same `<KEY>` or starts with `<story-id> ` (`… follow-up:` is a different card), or that carries the tag `<KEY>` / `story-<story-id>`, means create and release nothing new: release the existing card if it is the releasable Backlog card, otherwise name both in the report. No key or id → compare titles and descriptions and say the match was by text. Also skip work with an open PR or branch (`gh pr list --search …`) whose card is not past Backlog — drift to report — and work whose card is tagged `superseded` or whose latest `decision` comment cancels it. Write in the report how many releases this check stopped.
+        For every card you are about to create or release, list the tasks of every column, including Human-gated, Blocked, Needs Planning, After Deploy (Human action) and Done. Another card whose title contains the same `<KEY>` or starts with `<story-id> ` (`… follow-up:` is a different card), or that carries the tag `<KEY>` / `story-<story-id>`, means create and release nothing new: release the existing card if it is the releasable Backlog card, otherwise name both in the report. No key or id → compare titles and descriptions and say the match was by text. Also skip work with an open PR or branch (`gh pr list --search …`) whose card is not past Backlog — drift to report — and work whose card is tagged `superseded` or whose latest `decision` comment cancels it. List with `include_archived: true`: an archived card for the same work counts — create and release nothing for it and name the archived card in the report. Write in the report how many releases this check stopped.
       required: true
     - name: Create missing cards in Backlog
       instructions: |-
@@ -1111,7 +1122,7 @@ workflows:
       required: false
     - name: Move released cards to Tech Design
       instructions: |-
-        For each released card: set the assignee round-robin over the agent members from `board_list_members`, continuing from the most recently created assigned card (skip a member whose latest runs failed with "Quota exceeded" or "login has expired"; all failing → assign by rotation and say so), add the footprint and any `Base: #N (<branch>)` line to its description, then move it Backlog → **Tech Design**. Entry fires that workflow immediately, so the card must be complete first. One ≤ 5-line release comment per card. Nothing released → skip.
+        For each released card: set the assignee round-robin over the agent members from `board_list_members`, continuing from the most recently created assigned card (skip a member whose latest run shows one of these signs — "Quota exceeded", "login has expired", "no output for 30 minutes" / a spend-limit dialog, or a run cancelled with 0 steps (an ordinary cancel after steps ran does not count); all failing → assign by rotation and say so), add the footprint and any `Base: #N (<branch>)` line to its description, then move it Backlog → **Tech Design**. Entry fires that workflow immediately, so the card must be complete first. One ≤ 5-line release comment per card. Nothing released → skip.
       required: false
     - name: Watchdog cards stuck in an automated column
       instructions: |-
@@ -1144,6 +1155,10 @@ workflows:
   - key: slice_the_ask
     name: Slice the ask & record the decision
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       ## Task
 
       A card sits in **Needs Planning**. It is one of three kinds — read the title and tags first:
@@ -1405,6 +1420,10 @@ workflows:
   - key: tech_design_spec
     name: Tech design / spec
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       Write the implementation-ready spec for the attached card. The output is a **technical spec posted as a comment on the card, tagged `tech_design`** — do not write spec, plan or planning-artefact files into the repository.
 
       ## Inputs
@@ -1569,6 +1588,10 @@ workflows:
   - key: produce_ui_spec
     name: Produce UI/UX spec
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       Produce a concrete UI/UX spec for the attached card and attach it as a comment tagged `design`. Inputs: the card and all its comments (the `tech_design` comment with its `## Design source screens` section, any `design_feedback` or `design_approved` comment); the spec — the product spec at `SPEC_PATH` and the planning artefacts in `PLANNING_DIR` when set, the tracker ticket when the card title carries a tracker key and a tracker tool is in the session (otherwise the card description), the repository's own docs, `decision` comments; the design source (`DESIGN_SOURCE`); and the existing design system — the component library and the current screens in the project repository at `/workspace/repo`, read on `{{inputs.integration_branch}}`. Read `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md` at the repository root — whichever exist — first; they are binding. Reuse existing components; do not design a new visual language. Playwright is attached for opening screens, Context7 for library documentation; use the project's skills, if any are attached. Agents never write to the tracker.
 
       Treat the tech design's screen list and its gaps as claims and check them on the design source yourself.
@@ -1733,6 +1756,10 @@ workflows:
   - key: design_sync_and_route
     name: Design sync & route
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       Run the design sync for this card if one is configured for the project, then route the card.
 
       ## The design sync is optional
@@ -1810,6 +1837,10 @@ workflows:
   - key: implement_and_open_pr
     name: Implement the card, open PR
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       Implement the card. **The spec:** if the card title carries a tracker key (`PROJ-123`) and a tracker tool is available in the session, the tracker ticket — description, acceptance criteria, parent epic, links — is the spec; otherwise the card description is the spec. When `PLANNING_DIR` is set, the story in `epics.md` and, when `SPEC_PATH` is set, the spec sections it cites are read with it. Precedence when they disagree: the product spec and the planning artefacts, then the tracker ticket with its epic and links, then the repository's own docs, then `decision` comments on the card and linked cards; a product decision by `{{inputs.product_owner}}` beats an engineering ruling. Agents never write to the tracker (no comments, no transitions). The card's `tech_design` comment and, for UI work, its `design` comment with any attached mockups are the contract.
 
       Before the first change, read `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md` at the root of the project repository (checked out at `/workspace/repo`) — whichever exist — and every per-area rule file they point at. Those rules are binding. The project's skills, if any are attached, apply the same way; the Context7 MCP server answers the library questions the repository's docs do not.
@@ -2107,6 +2138,10 @@ workflows:
   - key: ci_check
     name: CI Check
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       The gate has resolved — read it, route the card, finish the session. Nothing here runs a suite, and nothing here holds a machine.
 
       **What to read.** `board_list_gates` for the card gives the gate Implementation created for the PR's `CI_CHECK_NAME` run and its state (resolved, expired on its TTL, or `stale`). The verdict itself comes from GitHub, for the PR head sha and no other commit: `gh pr view <n> --json headRefOid,baseRefName,mergeable,mergeStateStatus`, `gh pr checks <n>`, `gh run list --commit <head sha> --workflow "<CI_CHECK_NAME>"`, and `gh api repos/<owner>/<repo>/actions/runs/<id>/jobs` for the jobs and their annotations. Every required job of that run counts; a run on an older sha is not this head's verdict.
@@ -2163,6 +2198,10 @@ workflows:
   - key: review_diff_and_route
     name: Review diff & route
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       Review the card's open PR (`gh pr view <n>`, `gh pr diff <n>`) against the spec and against the repository's rules. Read the code, not just the summary: the implementation comment is a claim, not evidence. Use the project's skills, if any are attached, and Context7 when a finding depends on a library's documented behaviour.
 
       **The spec, in order of precedence:** (1) the product spec at `SPEC_PATH` and the planning artefacts in `PLANNING_DIR` when set, read on `{{inputs.integration_branch}}` — each requirement together with every `[AMENDED …]` / `[NEW …]` block under it, a later block beats the text above it; (2) if the card title carries a tracker key (`PROJ-123`) and a tracker tool is available in the session, the tracker ticket — description, acceptance criteria, parent epic, links — otherwise the card description; (3) the card's `tech_design` and `design` comments and its `## Edge cases` block; (4) `decision` comments on the card and the cards it cites. A product decision by `{{inputs.product_owner}}` beats an engineering ruling. Agents never write to the tracker.
@@ -2281,6 +2320,10 @@ workflows:
   - key: merge_into_staging_and_deploy
     name: Merge into the staging branch & deploy
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       ## Task
 
       Merge the card's feature branch into `{{inputs.staging_branch}}`, push, watch the staging deploy workflow (`STAGING_DEPLOY_WORKFLOW`) for the pushed sha until its deploy jobs (build, migrations, rollout) finish, prove the deployment answers, then hand the card to **After Deploy (Human action)** (hand-run ops required) or **Verify** (otherwise).
@@ -2484,6 +2527,10 @@ workflows:
   - key: verify_on_staging
     name: Verify the card on real staging
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       ## Task
 
       Open the deployed staging app (`STAGING_BASE_URL`), prove the card does what its spec promises, and say **ACCEPTED**, **REJECTED** or **BLOCKED**. No suite, no diff — CI proved the branch, Code Review read it. Use the Playwright MCP browser tools (or the browser tools attached to this stage) for every walk; the project's skills, if any are attached, say how the team likes them driven.
@@ -2852,6 +2899,10 @@ workflows:
   - key: triage_message_and_act
     name: Triage message & act
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       ## Task
 
       A message containing the word `triage` arrived in the intake channel (`INTAKE_CHANNEL`). Work out what
@@ -3376,6 +3427,10 @@ workflows:
   - key: build_plan_from_spec
     name: Build epics, graph and sprint status from the spec
     instructions: |-
+      ## Archived cards
+
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. Duplicate checks are the exception: look with `include_archived: true` — archiving is a person's "not doing this", so an archived card for the same work means create nothing; name it in the report.
+
       ## Task
 
       The specification already exists: the product spec / PRD at `SPEC_PATH` in the project repository
