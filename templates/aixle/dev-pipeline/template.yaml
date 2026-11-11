@@ -681,11 +681,11 @@ workflows:
       catalogues, generated API clients) are a collision unless the repository's docs say the file merges
       cleanly per section — then the footprint is the section, and name the section each card owns.
 
-      **One pool, fill every free slot.** The Backlog cards, the graph frontier and the off-graph stories are **one candidate pool**, not a ladder you climb only when a rung is empty — the frontier is never empty, so a ladder never reaches Backlog. Rank the whole pool by § B.2, walk it in rank order and test each candidate against what is in flight, After Deploy, and what you have already picked; **a collision skips that candidate, it never ends the cycle.** Stop only when the free slots are filled or every candidate in the pool has been tested — take the time this needs within the cycle. Stopping with free slots left is allowed only with, in the report, each refused candidate and the exact card and file it collided with, or the eligibility rule it failed; "not read" or "not checked" is never a reason. Free slots are still a ceiling, never a quota: a colliding or ineligible card is never released to fill one.
+      **One pool, fill every free slot.** The Backlog cards, the graph frontier and the off-graph stories are **one candidate pool**, not a ladder you climb only when a rung is empty — the frontier is never empty, so a ladder never reaches Backlog. Rank the whole pool by § B.2, walk it in rank order and test each candidate against what is in flight, After Deploy, and what you have already picked; **a collision skips that candidate, it never ends the cycle.** Stop when the free slots are filled or the **candidate budget** is spent: test at most the free slots + 10 candidates, in rank order, and derive footprints only for those. A budget spent with free slots left is reported as such. Stopping with free slots left is allowed only with, in the report, each refused candidate and the exact card and file it collided with, or the eligibility rule it failed; "not read" or "not checked" is never a reason. Free slots are still a ceiling, never a quota: a colliding or ineligible card is never released to fill one.
 
       **A footprint is a list of files, not an area.** Two cards collide only when both would edit the **same file** — or, for a shared generated file the repository's docs say merges cleanly per section, the same section. "The billing module", "the API package", "the background workers" are areas, not footprints: never refuse a candidate on an area label. Take each side's file list from the `paths:` line, the footprint in the description, or the branch diff. For a candidate with none, derive it from its spec and the code — the controllers, models, services, jobs, pages, components, migrations and tests it would edit — at file level, at worst one directory deep. Files both sides only read or only call are not a collision. A refusal names the shared file(s) and the card holding them.
 
-      **Archived cards are not on the board.** `board_list_tasks` has **no** archive filter: it returns archived and active cards together, and every row carries an `archived` flag. Drop every row whose `archived` is true **before anything else** — the cap count, footprint collisions, Backlog candidates, the Blocked scan, stuck-card re-triggers and every "is there already a card for this" check. An archived card holds no slot, has no live footprint, is never released, re-triggered or watchdogged, and does not count as an existing card. One exception: a dependency whose card was archived from **Done** is satisfied. (If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.)
+      **Archived cards are not on the board.** Depending on the Flow version, `board_list_tasks` either hides archived cards or returns them with `archived: true`. Drop every row with `archived: true`, if any appear, **before anything else** — the cap count, footprint collisions, Backlog candidates, the Blocked scan, stuck-card re-triggers and every "is there already a card for this" check. An archived card holds no slot, has no live footprint, is never released, re-triggered or watchdogged, and does not count as an existing card. One exception: a dependency whose card was archived from **Done** is satisfied — when a dependency's card is missing from the list, look it up with `board_list_tasks` and `include_archived: true` before calling it unresolved.
 
       **Respect the {{inputs.wip_cap}}-card cap.** Archived cards never count. Count what already sits in Tech Design → Verify first;
       release only up to the difference. A full pipeline means release nothing, however eligible the queue
@@ -834,7 +834,7 @@ workflows:
 
       **Skip an agent that is failing.** Agent subscriptions and logins change, so no member is permanently
       good or bad. Before assigning, look at the latest workflow runs of cards assigned to each member
-      (`session_list`, then `session_log` for the error message). A member whose latest run failed or was cancelled — "Quota exceeded", "login has expired", "no output for 30 minutes" / a spend-limit dialog, or a run cancelled with 0 steps — is skipped in the rotation until a later run of theirs
+      (`session_list`, then `session_log` for the error message). A member whose latest run shows one of these signs — "Quota exceeded", "login has expired", "no output for 30 minutes" / a spend-limit dialog, or a run cancelled with 0 steps (an ordinary cancel after steps ran does not count) — is skipped in the rotation until a later run of theirs
       succeeds. If every member is failing, assign by the rotation anyway and say so in your report.
 
       **`board_create_task` targets Backlog.** Entry into an automated column fires that workflow
@@ -1097,17 +1097,15 @@ workflows:
       required: true
     - name: Count work in flight against the cap
       instructions: |-
-        Drop every row whose `archived` is true first — an archived card holds no slot. Count cards sitting in Tech Design → Verify. **Cards in After Deploy (Human action), Blocked and Human-gated hold no slot** — they wait on a person — but After Deploy cards' footprints still count for every collision check (their PR into `{{inputs.integration_branch}}` is still open). Release only up to the difference from the **{{inputs.wip_cap}}-card cap** — both the ceiling on work in flight and the most you may release in one cycle. A full pipeline means release nothing. **Free slots are a ceiling, never a quota:** never pad a batch. The board is ground truth: a mismatch between the board, the tracker, `sprint-status.yaml` and open PRs is drift to report, never to fix.
+        Drop any row with `archived: true` first — an archived card holds no slot. Count cards sitting in Tech Design → Verify. **Cards in After Deploy (Human action), Blocked and Human-gated hold no slot** — they wait on a person — but After Deploy cards' footprints still count for every collision check (their PR into `{{inputs.integration_branch}}` is still open). Release only up to the difference from the **{{inputs.wip_cap}}-card cap** — both the ceiling on work in flight and the most you may release in one cycle. A full pipeline means release nothing. **Free slots are a ceiling, never a quota:** never pad a batch. The board is ground truth: a mismatch between the board, the tracker, `sprint-status.yaml` and open PRs is drift to report, never to fix.
       required: true
     - name: Select the independent batch
       instructions: |-
-        Candidates: **Backlog cards**, plus — when `PLANNING_DIR` is set — **frontier stories** (status `backlog` or no key, every graph ancestor done, no card anywhere, no open PR, no `Gated by:` an open question) and off-graph stories in `epics.md` (no status key, no graph node; report them as off-graph). Each needs every dependency satisfied and an actionable spec; leave alone a card younger than one cycle (check `session_list`), one with a `needs-human` / `blocked` / pending-`credentials` marker, a stub, or a scope-shaped card. Read each Backlog card's latest `decision` comment: a settled decision outranks a stale description — reconcile it (`## Decision — <date> (comments <ids>)` on top, stale text under `## Superseded (kept for history)`, delete nothing) before moving. Procure-and-configure cards stay in Backlog until their access exists.
+        Drop any row with `archived: true` first. Candidates: **Backlog cards**, plus — when `PLANNING_DIR` is set — **frontier stories** (status `backlog` or no key, every graph ancestor done, no card anywhere, no open PR, no `Gated by:` an open question) and off-graph stories in `epics.md` (no status key, no graph node; report them as off-graph). Each needs every dependency satisfied and an actionable spec; leave alone a card younger than one cycle (check `session_list`), one with a `needs-human` / `blocked` / pending-`credentials` marker, a stub, or a scope-shaped card. Read each Backlog card's latest `decision` comment: a settled decision outranks a stale description — reconcile it (`## Decision — <date> (comments <ids>)` on top, stale text under `## Superseded (kept for history)`, delete nothing) before moving. Procure-and-configure cards stay in Backlog until their access exists.
 
         Pick up to the free slots with no dependency path between any two, pairwise disjoint footprints, and no collision with anything in flight **or in After Deploy (Human action)**. **The pairwise tests bound the batch, not the cap** — *n* candidates are *n(n−1)/2* pairs; check them in rank order. Rank by what a card unblocks (§ B.2): Blocked cards it frees (work-gated, base-red), then transitive dependants, then pending work assuming it; ties → priority, `bug`, keystone / critical path / wave when the graph has them, oldest. Say whether each count was counted or estimated. Release only into **Tech Design**. **Never take from Needs Planning, Human-gated or After Deploy (Human action).** Nothing eligible → release nothing, one line.
 
-        Drop every row whose `archived` is true before building the pool.
-
-        **One pool, fill every free slot.** The Backlog cards, the graph frontier and the off-graph stories are **one candidate pool**, not a ladder you climb only when a rung is empty — the frontier is never empty, so a ladder never reaches Backlog. Rank the whole pool by § B.2, walk it in rank order and test each candidate against what is in flight, After Deploy, and what you have already picked; **a collision skips that candidate, it never ends the cycle.** Stop only when the free slots are filled or every candidate in the pool has been tested — take the time this needs within the cycle. Stopping with free slots left is allowed only with, in the report, each refused candidate and the exact card and file it collided with, or the eligibility rule it failed; "not read" or "not checked" is never a reason. Free slots are still a ceiling, never a quota: a colliding or ineligible card is never released to fill one.
+        **One pool, fill every free slot.** The Backlog cards, the graph frontier and the off-graph stories are **one candidate pool**, not a ladder you climb only when a rung is empty — the frontier is never empty, so a ladder never reaches Backlog. Rank the whole pool by § B.2, walk it in rank order and test each candidate against what is in flight, After Deploy, and what you have already picked; **a collision skips that candidate, it never ends the cycle.** Stop when the free slots are filled or the **candidate budget** is spent: test at most the free slots + 10 candidates, in rank order, and derive footprints only for those. A budget spent with free slots left is reported as such. Stopping with free slots left is allowed only with, in the report, each refused candidate and the exact card and file it collided with, or the eligibility rule it failed; "not read" or "not checked" is never a reason. Free slots are still a ceiling, never a quota: a colliding or ineligible card is never released to fill one.
 
         **A footprint is a list of files, not an area.** Two cards collide only when both would edit the **same file** — or, for a shared generated file the repository's docs say merges cleanly per section, the same section. "The billing module", "the API package", "the background workers" are areas, not footprints: never refuse a candidate on an area label. Take each side's file list from the `paths:` line, the footprint in the description, or the branch diff. For a candidate with none, derive it from its spec and the code — the controllers, models, services, jobs, pages, components, migrations and tests it would edit — at file level, at worst one directory deep. Files both sides only read or only call are not a collision. A refusal names the shared file(s) and the card holding them.
       required: true
@@ -1121,7 +1119,7 @@ workflows:
       required: false
     - name: Move released cards to Tech Design
       instructions: |-
-        For each released card: set the assignee round-robin over the agent members from `board_list_members`, continuing from the most recently created assigned card (skip a member whose latest run failed or was cancelled — "Quota exceeded", "login has expired", "no output for 30 minutes" / a spend-limit dialog, or a run cancelled with 0 steps —; all failing → assign by rotation and say so), add the footprint and any `Base: #N (<branch>)` line to its description, then move it Backlog → **Tech Design**. Entry fires that workflow immediately, so the card must be complete first. One ≤ 5-line release comment per card. Nothing released → skip.
+        For each released card: set the assignee round-robin over the agent members from `board_list_members`, continuing from the most recently created assigned card (skip a member whose latest run shows one of these signs — "Quota exceeded", "login has expired", "no output for 30 minutes" / a spend-limit dialog, or a run cancelled with 0 steps (an ordinary cancel after steps ran does not count); all failing → assign by rotation and say so), add the footprint and any `Base: #N (<branch>)` line to its description, then move it Backlog → **Tech Design**. Entry fires that workflow immediately, so the card must be complete first. One ≤ 5-line release comment per card. Nothing released → skip.
       required: false
     - name: Watchdog cards stuck in an automated column
       instructions: |-
@@ -1154,9 +1152,9 @@ workflows:
   - key: slice_the_ask
     name: Slice the ask & record the decision
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       ## Task
 
@@ -1419,9 +1417,9 @@ workflows:
   - key: tech_design_spec
     name: Tech design / spec
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       Write the implementation-ready spec for the attached card. The output is a **technical spec posted as a comment on the card, tagged `tech_design`** — do not write spec, plan or planning-artefact files into the repository.
 
@@ -1587,9 +1585,9 @@ workflows:
   - key: produce_ui_spec
     name: Produce UI/UX spec
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       Produce a concrete UI/UX spec for the attached card and attach it as a comment tagged `design`. Inputs: the card and all its comments (the `tech_design` comment with its `## Design source screens` section, any `design_feedback` or `design_approved` comment); the spec — the product spec at `SPEC_PATH` and the planning artefacts in `PLANNING_DIR` when set, the tracker ticket when the card title carries a tracker key and a tracker tool is in the session (otherwise the card description), the repository's own docs, `decision` comments; the design source (`DESIGN_SOURCE`); and the existing design system — the component library and the current screens in the project repository at `/workspace/repo`, read on `{{inputs.integration_branch}}`. Read `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md` at the repository root — whichever exist — first; they are binding. Reuse existing components; do not design a new visual language. Playwright is attached for opening screens, Context7 for library documentation; use the project's skills, if any are attached. Agents never write to the tracker.
 
@@ -1755,9 +1753,9 @@ workflows:
   - key: design_sync_and_route
     name: Design sync & route
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       Run the design sync for this card if one is configured for the project, then route the card.
 
@@ -1836,9 +1834,9 @@ workflows:
   - key: implement_and_open_pr
     name: Implement the card, open PR
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       Implement the card. **The spec:** if the card title carries a tracker key (`PROJ-123`) and a tracker tool is available in the session, the tracker ticket — description, acceptance criteria, parent epic, links — is the spec; otherwise the card description is the spec. When `PLANNING_DIR` is set, the story in `epics.md` and, when `SPEC_PATH` is set, the spec sections it cites are read with it. Precedence when they disagree: the product spec and the planning artefacts, then the tracker ticket with its epic and links, then the repository's own docs, then `decision` comments on the card and linked cards; a product decision by `{{inputs.product_owner}}` beats an engineering ruling. Agents never write to the tracker (no comments, no transitions). The card's `tech_design` comment and, for UI work, its `design` comment with any attached mockups are the contract.
 
@@ -2137,9 +2135,9 @@ workflows:
   - key: ci_check
     name: CI Check
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       The gate has resolved — read it, route the card, finish the session. Nothing here runs a suite, and nothing here holds a machine.
 
@@ -2197,9 +2195,9 @@ workflows:
   - key: review_diff_and_route
     name: Review diff & route
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       Review the card's open PR (`gh pr view <n>`, `gh pr diff <n>`) against the spec and against the repository's rules. Read the code, not just the summary: the implementation comment is a claim, not evidence. Use the project's skills, if any are attached, and Context7 when a finding depends on a library's documented behaviour.
 
@@ -2319,9 +2317,9 @@ workflows:
   - key: merge_into_staging_and_deploy
     name: Merge into the staging branch & deploy
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       ## Task
 
@@ -2526,9 +2524,9 @@ workflows:
   - key: verify_on_staging
     name: Verify the card on real staging
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       ## Task
 
@@ -2835,10 +2833,6 @@ workflows:
   - key: answer_questions
     name: Answer questions about the card
     instructions: |-
-      ## Archived cards — never in scope
-
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
-
       ## Your Task
 
       Answer questions about the card this run was started from. Deliver a complete, standalone briefing first, then stay available for follow-up questions.
@@ -2902,9 +2896,9 @@ workflows:
   - key: triage_message_and_act
     name: Triage message & act
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       ## Task
 
@@ -3430,9 +3424,9 @@ workflows:
   - key: build_plan_from_spec
     name: Build epics, graph and sprint status from the spec
     instructions: |-
-      ## Archived cards — never in scope
+      ## Archived cards
 
-      Archived cards are not work. `board_list_tasks` and `board_get_task` still return them, in the column they were archived from, with `archived: true` on the row — `board_list_tasks` has no archive filter. **Drop every archived row before you count, rank, release, move, assign, comment, triage, notify, watchdog or check collisions.** Never move, comment on, reopen, assign or notify about an archived card, and never treat one as a card to act on. If the card this run was started for is archived, do nothing and end with a one-line report saying so. An archived card does not count as an existing card for any "is there already a card for this" check; its only use is as a satisfied dependency, when it was archived from Done. If you read the board through an MCP `list_board_tasks` instead, pass `archived: false`.
+      Ignore archived cards: drop any board row with `archived: true` before acting on it, and if the card this run was started for is archived, do nothing and end with a one-line report. An archived card never counts as an existing card in a duplicate check.
 
       ## Task
 
