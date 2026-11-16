@@ -45,6 +45,6 @@ To post to Slack:
 
 1. Start the workflow by hand from the Workflows page. One run takes about 10–15 minutes.
 2. Check `ga_weekly_summary.md` and `ga_weekly_report.html` in the run outputs.
-3. Turn on the **Weekly GA4 report** trigger. It runs every Monday at 09:00 `America/New_York`. Change the time zone or time first if you need to.
+3. Turn on the **Weekly GA4 report (Mon 9:00 New York)** trigger. It runs every Monday at 09:00 `America/New_York`. Change the time zone or time first if you need to.
 
-Scheduled runs use the agent credential of the person who turns the trigger on, and are billed to that person.
+Scheduled runs belong to the person who installed the template: they use that person's agent credential and are billed to them. Turning the trigger on does not change this. To run as another project member or a team, change **Runs as** in the trigger's settings.
