@@ -1,0 +1,282 @@
+format_version: 1
+namespace: aixle
+slug: ga4-weekly-report
+version: 1
+name: GA4 Weekly Report
+summary: 'Weekly Google Analytics 4 report for any website: week-over-week KPIs, what
+  to optimize, where to save money, an HTML presentation and an optional Slack post.'
+inputs:
+- key: ga4_property_id
+  label: GA4 property id
+  type: string
+  required: true
+  description: The numeric property id from GA4 Admin > Property details, for example
+    123456789. Not the G- measurement id.
+- key: site_url
+  label: Site URL
+  type: string
+  required: true
+  description: The website the property tracks, for example https://www.example.com.
+    KPIs count traffic on this host only.
+- key: slack_channel
+  label: Slack channel (optional)
+  type: string
+  default: none
+  required: false
+  description: A Slack channel id or name to post the report to, connected in Aixle
+    (Integrations > Slack > Connect a channel). Leave "none" to skip Slack.
+agents:
+- key: ga4_analytics_reporter
+  name: ga4_analytics_reporter
+  title: GA4 Analytics Reporter
+  icon: chart
+  persona: 'A web-analytics analyst who turns two weeks of GA4 data into a few evidence-based
+    actions for a marketing team. Runs unattended: never asks questions, writes N/A
+    for missing data and continues.'
+  principles: |-
+    - Every claim cites a number from the data.
+    - Separate signal from noise; data-quality problems are reported, not acted on.
+    - Never invent cost, revenue or key events the property does not report.
+    - Query only the property in GA4_PROPERTY_ID.
+  communication_style: Direct and data-first. Lead with numbers. No filler, no hedging.
+    Markdown tables for metrics.
+mcp_servers:
+- key: google_analytics
+  custom:
+    name: google-analytics
+    description: Google Analytics 4 Data/Admin API (analytics-mcp). Needs env GOOGLE_PROJECT_ID
+      (Google Cloud project of the service account) and GOOGLE_APPLICATION_CREDENTIALS
+      (path to the service-account JSON key, e.g. /workspace/assets/google-credentials.json).
+      The service account needs Viewer access to the GA4 property in GA4_PROPERTY_ID.
+    transport: stdio
+    url: ''
+    command: pipx
+    args:
+    - run
+    - "--spec"
+    - analytics-mcp==0.8.0
+    - analytics-mcp
+    env:
+      GOOGLE_PROJECT_ID: config_item:GOOGLE_PROJECT_ID
+      GOOGLE_APPLICATION_CREDENTIALS: config_item:GOOGLE_APPLICATION_CREDENTIALS
+    auth_type: none
+tools:
+- key: chat_post_message
+  platform: chat_post_message
+workflows:
+- key: ga4_weekly_report
+  name: GA4 Weekly Report
+  description: 'Weekly GA4 report for any website: compares the last full week with
+    the week before, finds where the site can convert better and where spend can be
+    cut, and produces a Markdown analysis, an executive summary and a self-contained
+    HTML presentation. Optionally posts the report to Slack. See SETUP.md.'
+  base:
+    config_items:
+    - GA4_PROPERTY_ID
+    - SITE_URL
+    - SLACK_CHANNEL_ID
+    - GOOGLE_PROJECT_ID
+    - GOOGLE_APPLICATION_CREDENTIALS
+  steps:
+  - key: collect_ga4_data_and_analyze
+    name: Collect GA4 data and analyze
+    instructions: |-
+      ## Your task
+      Collect last week's Google Analytics 4 data for the site, compare it with the week before, and write down what to optimize and where money can be saved. The next step turns your files into the final report.
+
+      ## Settings
+      Read these config items with `get_config_item` before you start:
+      - `GA4_PROPERTY_ID` — the numeric GA4 property id. Query it as `properties/<GA4_PROPERTY_ID>` for every GA4 call. Do not query any other property.
+      - `SITE_URL` — the website this property tracks. Use it to name the site in the report and to tell its traffic from other hosts.
+
+      Stop and fail the step with a clear message if:
+      - `GA4_PROPERTY_ID` or `SITE_URL` is missing or still `CHANGE_ME` (name the config item to set);
+      - `GA4_PROPERTY_ID` is not all digits ("GA4_PROPERTY_ID must be the numeric property id, not a G- measurement id");
+      - the google-analytics MCP cannot authenticate or cannot read its credentials file. Report the exact error. Do not create, copy, move or link credential files to work around it.
+
+      ## Wait for the google-analytics MCP
+      The google-analytics MCP server installs its package on first start, which can take up to two minutes. If its tools (`get_property_details`, `run_report`, `list_google_ads_links`) are not available yet, wait 30 seconds and check again, up to 4 times. Only then fail the step with "google-analytics MCP did not start" and what you saw. Never call the GA4 API by other means.
+
+      ## Time window
+      Read the property's time zone and currency with `get_property_details`. The last full week is the most recent Monday–Sunday that ended before today in that time zone; the previous week is the 7 days before it. Compare only these two weeks. Do not query, chart or mention any other period. Write both date ranges and the time zone at the top of the report. GA4 can take up to 48 hours to process data: if the last day looks incomplete (a sharp drop on Sunday only), say so in the data-quality notes.
+
+      ## What to collect
+      Use the google-analytics MCP. Prefer batched queries. If a query fails, note it as N/A and continue.
+      - Overview: users, new users, sessions, engaged sessions, engagement rate, average engagement time, views, key events (`keyEvents`, `sessionKeyEventRate`; do not use the deprecated `conversions`), and `totalRevenue` only if it is non-zero.
+      - Acquisition: sessions, engagement and key events by default channel group and by source / medium; UTM campaigns with their performance.
+      - Ad cost: Google Ads cost, clicks and ROAS (`advertiserAdCost`, `advertiserAdClicks`, `returnOnAdSpend`) only if `list_google_ads_links` shows a linked account. If they are 0 or empty even with a link, write "Ads cost not available in GA4"; never read it as "no spend". GA4 has no cost data for other paid platforms: never estimate spend; judge those sources by engagement and key-event rate and say that their cost is unknown.
+      - Content: top landing pages and top pages by views, with engagement rate and key events; pages with high traffic and low engagement; 404 / "page not found" titles.
+      - Audience and tech: device category, country, browser; mobile vs desktop gaps.
+      - Events: the list of key events; flag it if no lead- or purchase-type key event exists.
+
+      ## Data quality (do this before the analysis)
+      - **Host.** Get sessions by `hostName` for both weeks. Apply the `SITE_URL` host as a `hostName` dimension filter on every KPI query. If a query rejects that filter, run it without the filter, label that table "all hosts", and state the other hosts' share of sessions. List other hosts (localhost, preview or staging domains) as excluded, with their session counts.
+      - **Bots.** A suspected bot segment is a city with at least 5 sessions in the current week, engagement rate below 15%, average engagement time per session below 3 seconds, and 0 key events. Apply this exact rule to both weeks, list every segment it matches with its numbers, and show the headline KPIs with and without them. Mention other suspicious segments separately without removing them.
+      - Also note suspected spam referrals, (not set) / unassigned traffic, missing UTMs, and sudden zero values that point to a tracking break.
+
+      ## Analysis
+      For every KPI in the tables compute the week-over-week change: ((current − previous) / previous) × 100, one decimal, with sign. If the previous value is 0, write `new`. Then write two sections of findings. Each finding must rest on specific numbers from the data, name the page, channel or campaign involved, and say what to do:
+      1. **Optimize the site (marketing):** conversion funnel, CTAs, landing pages, SEO and content, UX, tracking gaps.
+      2. **Save money / create extra value:** paid channels or campaigns with poor engagement or ROAS, wasted spend, under-used high-performing channels or pages.
+
+      Treat small week-to-week swings and data-quality problems as noise, and say so instead of recommending a site change.
+
+      ## Output
+      - `/workspace/outputs/ga_weekly_report.md` — the full analysis: date ranges and time zone, data collection timestamp, KPI tables with WoW deltas (bold any change above ±20%), the two findings sections, a `## Data quality` section, and a `## Recommended actions` section with the top 3–5 actions ranked by expected impact.
+      - `/workspace/outputs/ga_raw_data.json` — the GA4 numbers you used, keyed by query (dimensions, metrics, date range, rows). Full API payloads are not required.
+    agent: ga4_analytics_reporter
+    mcp_servers:
+    - google_analytics
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+    output_asset_specs:
+    - name: ga_weekly_report.md
+      required: true
+      asset_type: markdown
+      required_sections:
+      - Data quality
+      - Recommended actions
+    - name: ga_raw_data.json
+      required: true
+      asset_type: json
+  - key: prepare_report
+    name: Prepare report
+    instructions: |-
+      ## Your task
+      Turn the analysis from the previous step into the final weekly report: a one-page executive summary and a self-contained HTML presentation.
+
+      ## Inputs
+      - `/workspace/assets/ga_weekly_report.md` — the full analysis with date ranges, KPI tables, findings, data-quality notes and recommended actions.
+      - `/workspace/assets/ga_raw_data.json` — raw GA4 data, if you need a number that is not in the report.
+      - Config item `SITE_URL` (read with `get_config_item`) — the site name for titles.
+
+      Use only numbers from these files. Do not query GA4 and do not add periods other than the two weeks in the report.
+
+      ## 1. Executive summary — `/workspace/outputs/ga_weekly_summary.md`
+      One page a busy stakeholder reads in two minutes:
+      - title with the site and the date range;
+      - 4–6 headline KPIs with WoW deltas;
+      - the top 3 wins and top 3 concerns, each one line with its number;
+      - the top 3–5 recommended actions, ranked by expected impact, split into "Optimize the site" and "Save money / create value";
+      - one line on data quality (or "no data-quality issues found").
+
+      ## 2. HTML presentation — `/workspace/outputs/ga_weekly_report.html`
+      A single self-contained HTML file (inline CSS and SVG charts, no external scripts, fonts or images) that opens offline in a browser:
+      - slide-style sections: title, KPI overview, acquisition, content and landing pages, audience and devices, findings (optimize / save money), recommended actions, data-quality notes;
+      - KPI cards with WoW deltas, green for good and red for bad changes;
+      - simple bar charts comparing the two weeks;
+      - neutral, clean design with system fonts; readable on mobile;
+      - at most 10 rows per table; keep the file under 1 MB.
+    agent: ga4_analytics_reporter
+    depends_on:
+    - collect_ga4_data_and_analyze
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+    input_asset_specs:
+    - name: ga_weekly_report.md
+      required: true
+      asset_type: markdown
+    - name: ga_raw_data.json
+      required: false
+      asset_type: json
+    output_asset_specs:
+    - name: ga_weekly_summary.md
+      required: true
+      asset_type: markdown
+    - name: ga_weekly_report.html
+      required: true
+      asset_type: html
+  - key: post_to_slack_optional
+    name: Post to Slack (optional)
+    instructions: |-
+      ## Your task
+      Post the weekly report to Slack if a channel is configured. This step is optional: it never blocks the report, which is already saved as run outputs.
+
+      1. Read the config item `SLACK_CHANNEL_ID` with `get_config_item`. If it is missing, empty, `none` or `CHANGE_ME`, write `Slack: skipped (SLACK_CHANNEL_ID not set)` to `/workspace/outputs/slack_status.md` and finish.
+      2. Otherwise build one readable message from `/workspace/assets/ga_weekly_summary.md` and post it with `chat_post_message` (see below).
+      3. Write `Slack: posted to <channel>` to `/workspace/outputs/slack_status.md`.
+
+      If `chat_post_message` is not available (the chat integration is not connected) or returns an error (for example, the channel is not connected in Aixle), write `Slack: failed — <reason>` to `/workspace/outputs/slack_status.md` and finish without retrying.
+
+      ## The message
+      Call `chat_post_message` with:
+      - `conversation`: the value of `SLACK_CHANNEL_ID`;
+      - `text`: a one-line plain fallback, e.g. `GA4 weekly report — <site>, <date range>`;
+      - `files`: `[{"file_path": "/workspace/assets/ga_weekly_report.html"}]`;
+      - `slack_blocks`: a Block Kit array laid out like this, using numbers from the summary only:
+
+      1. `header` (plain_text, ≤ 150 chars): `📊 GA4 weekly report — <site>`.
+      2. `context`: one mrkdwn element: `<current week> vs <previous week> · <time zone>`.
+      3. `section` with `fields` (mrkdwn, 4–6 fields, two columns): one KPI per field, formatted as `*Sessions*\n390  ·  ▲ +6.0%` (▲ for up, ▼ for down, `new` when the previous value was 0).
+      4. `divider`.
+      5. `section` (mrkdwn): `*✅ Top wins*` and then one bullet per win (`•`), each one short line with its number.
+      6. `section` (mrkdwn): `*⚠️ Top concerns*` and the bullets, same style.
+      7. `divider`.
+      8. `section` (mrkdwn): `*🎯 Recommended actions*` and a numbered list (`1.`, `2.`, …) of the top 3–5 actions, each starting with the action in bold (`*Add contact CTAs*`) followed by one line with its evidence.
+      9. `context`: one mrkdwn element with the data-quality line and `Full report attached (HTML).`
+
+      Formatting rules: Slack mrkdwn, not Markdown — bold is `*text*`, italic `_text_`, no `#` headings, no Markdown tables, no `[label](url)` links. Keep each section under 3,000 characters and the whole message under 50 blocks. Short lines, one idea per bullet, no paragraphs longer than two lines.
+    agent: ga4_analytics_reporter
+    tools:
+    - chat_post_message
+    depends_on:
+    - prepare_report
+    on_failure: skip
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+    input_asset_specs:
+    - name: ga_weekly_summary.md
+      required: true
+      asset_type: markdown
+    - name: ga_weekly_report.html
+      required: true
+      asset_type: html
+    output_asset_specs:
+    - name: slack_status.md
+      required: true
+      asset_type: markdown
+triggers:
+- kind: schedule
+  workflow: ga4_weekly_report
+  name: Weekly GA4 report (Mon 9:00 New York)
+  trigger_mode: auto
+  subject_policy: none
+  cooldown_seconds: 0
+  status_reporting: failures
+  cron: 0 9 * * 1
+  timezone: America/New_York
+variables:
+- name: GA4_PROPERTY_ID
+  value: '{{inputs.ga4_property_id}}'
+  description: Numeric GA4 property id to report on (e.g. 123456789; queried as properties/<id>).
+    Find it in GA4 Admin > Property details.
+- name: GOOGLE_APPLICATION_CREDENTIALS
+  value: "/workspace/assets/google-credentials.json"
+  description: Path to the Google service-account JSON key inside the step container.
+    Upload the key as project asset google-credentials.json and attach it to the workflow;
+    the google-analytics MCP server reads this path.
+- name: SITE_URL
+  value: '{{inputs.site_url}}'
+  description: Public URL of the website the GA4 property tracks (e.g. https://www.example.com).
+    Names the site in the report; KPIs count traffic on this host only.
+- name: SLACK_CHANNEL_ID
+  value: '{{inputs.slack_channel}}'
+  description: Optional. Slack channel id or name to post the weekly report to. Leave
+    as "none" to skip Slack. The channel must be connected in Aixle (Integrations
+    → Slack → Connect a channel).
+requires:
+  integrations:
+  - chat
+  secrets:
+  - name: GOOGLE_PROJECT_ID
+    description: Google Cloud project id of the service account that reads GA4 (env
+      for the google-analytics MCP server). The service account must have Viewer access
+      to the GA4 property.
