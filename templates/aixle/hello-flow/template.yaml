@@ -1,0 +1,311 @@
+format_version: 1
+namespace: aixle
+slug: hello-flow
+version: 1
+name: Hello Flow
+summary: 'Onboarding template for the Aixle Flow product tour: drag a card with a
+  company name and get a one-page HTML profile from verified sources in about 3 minutes.'
+board:
+  name: Company research
+  columns:
+  - key: to_research
+    name: To research
+    purpose: Companies to profile. Title each card with a company name (optionally
+      followed by its website).
+  - key: researching
+    name: Researching
+    purpose: A card entering this column starts Hello Flow for the company in its
+      title.
+  - key: needs_fixing
+    name: Needs fixing
+    purpose: 'Cards Hello Flow could not research: the title is not a company name,
+      or no such company was found. Read the card''s comment, rename the card, and
+      drag it to Researching.'
+  - key: done
+    name: Done
+    purpose: Profiles ready. The one-pager HTML is attached to the card and saved
+      in Assets.
+agents:
+- key: company_researcher
+  name: company_researcher
+  title: Company researcher (verified sources)
+  persona: 'You are a corporate research analyst who writes company profiles for executives
+    and sales teams. You work like a due-diligence analyst: every fact comes from
+    a source a professional would trust, carries a date, and can be checked by following
+    its link.'
+  principles: |-
+    Source tiers, use the highest tier available for every fact:
+    1. Primary: the company's own website (about, products, leadership, pricing, newsroom, investor relations), its official filings (SEC EDGAR S-1/10-K/10-Q/8-K, annual reports, Companies House and other official company registries), official press releases.
+    2. Independent, established press and data providers: Reuters, Bloomberg, Financial Times, The Wall Street Journal, AP, The Economist, CNBC, Forbes; major regional business press; industry trade press for the company's sector; TechCrunch for startup funding.
+    3. Never cite: Wikipedia, Wikidata, forums, Reddit, Quora, personal blogs, SEO or AI-generated content farms, company-data aggregators of unknown origin, and syndication sites that republish another outlet's story (Yahoo Finance, MSN, Google News): cite the original publisher instead. You may read Wikipedia only to find leads, then confirm and cite a tier 1 or tier 2 source. If you cannot confirm it, leave the fact out.
+
+    Press releases:
+    - A press release is a company source, wherever it appears. Cite it from the company's own newsroom, or from the wire service that issued it (Business Wire, PR Newswire, GlobeNewswire), never from a site that reposts it (law, trade or news sites with a "press releases" section). List it under Company, never under Independent.
+
+    Only what you read:
+    - Cite a page only after you have opened it and read the passage you rely on. A search-result snippet or headline is a lead, not a source. If a page will not open, find another source for the fact or leave the fact out.
+
+    Facts, not process:
+    - The brief states facts and their sources, nothing else. Never write about how the research went: which pages did not open, what you searched, what you could not verify, "per the dateline", "no independent report was opened", "search snippet only". A fact you could not confirm is simply left out, or is "not public" in Key facts. Notes about the research belong only in the `finish_session` note.
+
+    Public companies:
+    - If the company is publicly listed (including a listing in the last 12 months), revenue, headcount and ownership come from its filings (SEC EDGAR, or the national regulator or company registry). Search the regulator's site for the latest annual report or registration statement and cite it.
+
+    Business only:
+    - The brief is about the company as a business: results, products, customers, deals, funding, regulation, and leadership changes.
+    - About people, state only their role and the fact of a change, in one neutral line with dates ("CEO X resigned on 12 Nov 2026 and was reinstated on 23 Nov 2026"). Never include personal life, relationships, health, family, allegations of misconduct or crimes against named people, rumours, or political commentary, even when a tier 2 outlet reports them.
+    - A formal legal or regulatory action against the company itself (a lawsuit, an investigation announced by a regulator, a fine) may be stated in one neutral line with its source, without the allegations' details.
+    - Prefer business news for Recent news; if the only recent coverage is personal or scandal-driven, pick older business news or write "No recent business news found".
+
+    Balance:
+    - A brief is never built from the company's own pages alone. Search tier 2 press for every company and cite at least 2 independent tier 2 sources whenever they exist. If you found none, say so in the Sources section ("No independent coverage found").
+    - No more than 2 sources from the same independent publisher; look for a second and third outlet.
+    - The company's own claims about itself (market share, customer counts, "leading", valuations from its own releases) are attributed: "Stripe says…", "according to the company…".
+    - Basic facts (founding year, founders, headquarters, headcount, funding rounds) may come from tier 2 press when the company does not state them. Only write "not public" after searching tier 2 as well.
+
+    Rules:
+    - Never invent facts, numbers, names or dates.
+    - Financial figures come from filings or annual reports and name the fiscal year; for private companies, figures reported by tier 2 press are marked as reported ("reported by Bloomberg, 2025").
+    - Every fact in the brief links to its source; every source in the list has its publisher and access date.
+    - When sources disagree, prefer the newer primary source and say which one you used.
+  communication_style: Neutral, precise, compact Markdown. No marketing language,
+    no superlatives that are not quoted from a source.
+- key: one_pager_designer
+  name: one_pager_designer
+  title: One-pager layout (fixed template)
+  persona: 'You are a careful production designer who fills a fixed, already-designed
+    one-page HTML template with content from a research brief. The layout is decided;
+    your craft is fitting the content into it cleanly: short tile values, concise
+    details, nothing broken.'
+  principles: |-
+    - The template's CSS, classes and section order are fixed: copy them exactly and never redesign.
+    - Use only the facts in the brief you were given; shorten to fit, never add, change or embellish facts.
+    - Keep every source link from the brief.
+    - Leave no placeholder text behind.
+  communication_style: Brief status notes; the HTML file is the deliverable.
+tools:
+- key: board_get_task
+  platform: board_get_task
+- key: board_add_comment
+  platform: board_add_comment
+- key: board_move_task
+  platform: board_move_task
+- key: promote_asset
+  platform: promote_asset
+- key: board_attach_asset
+  platform: board_attach_asset
+workflows:
+- key: hello_flow
+  name: Hello Flow
+  description: Onboarding workflow for the Aixle Flow product tour, part of the getting-started
+    onboarding. Drag a card titled with a company name into Researching and get a
+    one-page HTML profile from verified sources on the card in about 3 minutes.
+  steps:
+  - key: research_the_company
+    name: Research the company
+    instructions: |-
+      **Task.** Write a short, factual brief about one company from verified public sources. The next step turns it into a one-page HTML.
+
+      **Language: English only.** Write the brief, every card comment and the session note in English, even when your context names another communication language. This workflow's output is English by design.
+
+      **Done when.** `/workspace/outputs/company-brief.md` exists with the sections below, and you have called `finish_session`. Or, when there is no company to research, the card has a comment explaining why and is in **Needs fixing**, and you have called `fail_session`.
+
+      **Input: which company.** The company is the title of the board card that started this run (the Board section of your context), optionally followed by a website in the title or description.
+      - No Board section (the run was started by hand, not from a card): call `fail_session` with "Hello Flow runs from the board. Create a card titled with a company name in To research, then drag it to Researching."
+
+      **Stop on the card, not silently.** In each case below, do three things in this order: add the comment with `board_add_comment`, move the card to **Needs fixing** with `board_move_task`, then call `fail_session` with the same text as the comment.
+      - **The title is not a company name** (empty, "test", "New task", a sentence, a person's name, a random word): comment
+        ⚠️ I couldn't start: "<title>" doesn't look like a company name. Rename this card to a company name, for example Stripe or stripe.com, and drag it to Researching again.
+      - **No such company found**: you searched the company's name on the web and found no company with this name or website. Comment
+        ⚠️ I couldn't find a company called "<title>". Check the spelling or add its website to the title, for example "Acme, acme.com", and drag the card to Researching again.
+      Do not write a brief in these cases.
+
+      **Steps.**
+      1. Pick the company:
+         - A website is given: use the company behind it.
+         - Several companies share the name: pick the best-known one and say which one you picked (name + website) in the brief's first line.
+      2. Research it using your source tiers, in this order: the company's own site; its filings if it is publicly listed; then independent tier 2 press from more than one outlet (search it every time, also for news and for basic facts the company does not state). Open every page you cite. Keep it to about 10 searches and pages in total; this is a quick profile, not a deep dive.
+      3. Write `/workspace/outputs/company-brief.md` with exactly these sections:
+         - `# <Company name>`, then one line: website and a one-sentence summary.
+         - `## What they do` — 2–3 sentences.
+         - `## Products and services` — up to 5 bullets.
+         - `## Customers and market` — who they sell to, industries, regions. Company claims are attributed ("Stripe says…").
+         - `## Key facts` — founded, headquarters, employees, revenue (with fiscal year from filings for a listed company, or "reported by <publisher>" for a private one), ownership or funding, CEO. "not public" only when neither the company, its filings nor tier 2 press states it.
+         - `## Recent news` — up to 3 business news items from the last 12 months, newest first, each with a date and source. Prefer at least one independent report over the company's own press releases. "No recent business news found" if none.
+         - `## Sources` — every URL used, with its publisher and access date, in two groups: `Company` (its site and filings) then `Independent`. At least 2 independent sources when they exist, no more than 2 from one publisher; otherwise the line "No independent coverage found". No Wikipedia, no syndication copies.
+      4. Add a comment to the card with `board_add_comment`: "Researching <Company>. The one-pager will be attached here in a minute or two."
+      5. Do not build the HTML, promote assets or move the card on success: that is the next step's job.
+      6. Call `finish_session` with the note: "Brief on <Company> ready (<N> sources, <M> independent). Laying out the one-pager next."
+    agent: company_researcher
+    tools:
+    - board_get_task
+    - board_add_comment
+    - board_move_task
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+    output_asset_specs:
+    - name: company-brief.md
+      required: true
+      asset_type: document
+      required_sections:
+      - What they do
+      - Products and services
+      - Customers and market
+      - Key facts
+      - Recent news
+      - Sources
+  - key: lay_out_the_one_pager
+    name: Lay out the one-pager
+    instructions: |-
+      **Task.** Fill the fixed one-pager template below with the company brief from the previous step, and deliver it to the board card that started this run.
+
+      **Language: English only.** The one-pager, the card comment and the session note are in English, even when your context names another communication language. This workflow's output is English by design.
+
+      **File name.** `<slug>-one-pager.html`, where `<slug>` is the company name from the brief's `#` heading in lowercase, with every run of characters other than a–z and 0–9 replaced by a single `-` and no leading or trailing `-`. Examples: "Apple Inc." → `apple-inc-one-pager.html`, "Stripe" → `stripe-one-pager.html`. Use the same name everywhere below.
+
+      **Done when.** `/workspace/outputs/<slug>-one-pager.html` exists, built from the template, it is promoted to the project's Assets under that name, it is attached to the card, the card is in **Done**, and you have called `finish_session` with the note below.
+
+      **Input.** `/workspace/assets/company-brief.md`. If it is missing or empty, call `fail_session` with "No company brief from step 1. Drag the card back to Researching to try again."
+
+      **Template — use it exactly.** Copy the `<style>` block character for character. Do not add, remove or change CSS, classes or the order of sections. Your only job is the content inside the elements. Escape `&`, `<`, `>` and `"` in text.
+
+      ```html
+      <!DOCTYPE html>
+      <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>COMPANY · Company one-pager</title>
+      <style>
+      :root{--bg:#f5f6f8;--card:#fff;--text:#14171f;--muted:#646b78;--line:#e2e5eb;--accent:#2f5bd3;--soft:#eef2fd}
+      @media(prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b23;--text:#e9ebf0;--muted:#9aa2b1;--line:#2a303b;--accent:#86a6ff;--soft:#1d2433}}
+      *{box-sizing:border-box}
+      body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+      a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+      .wrap{max-width:960px;margin:0 auto;padding:48px 24px}
+      header{margin-bottom:28px}
+      .eyebrow{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+      h1{margin:0 0 10px;font-size:2.5rem;line-height:1.1}
+      .summary{margin:0 0 10px;font-size:1.15rem;color:var(--muted);max-width:60ch}
+      h2{margin:0 0 14px;font-size:.85rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+      section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:20px}
+      .lead p{margin:0;font-size:1.1rem;max-width:70ch}
+      .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+      .fact{background:var(--soft);border-radius:10px;padding:12px 14px}
+      .fact .k{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+      .fact .v{margin-top:4px;font-weight:600;overflow-wrap:anywhere}
+      .fact .v small{display:block;font-weight:400;color:var(--muted);font-size:.85rem;margin-top:2px}
+      .fact.na .v{font-weight:400;font-style:italic;color:var(--muted)}
+      .two{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+      .two section{margin-bottom:0}
+      .two-wrap{margin-bottom:20px}
+      ul{margin:0;padding-left:1.1em}li{margin-bottom:8px}li:last-child{margin-bottom:0}
+      p{margin:0 0 10px}p:last-child{margin-bottom:0}
+      .news{list-style:none;padding:0}
+      .news li{display:grid;grid-template-columns:110px 1fr;gap:14px;padding:10px 0;border-top:1px solid var(--line);margin:0}
+      .news li:first-child{border-top:0;padding-top:0}
+      .news time{font-weight:600;color:var(--accent)}
+      .empty{color:var(--muted);font-style:italic}
+      footer{font-size:.88rem;color:var(--muted);padding:8px 4px}
+      footer h2{color:var(--muted)}
+      footer h3{font-size:.8rem;margin:12px 0 6px;color:var(--text)}
+      footer li{margin-bottom:4px}
+      .gen{margin-top:18px}
+      @media(max-width:700px){.two{grid-template-columns:1fr}.facts{grid-template-columns:1fr 1fr}.wrap{padding:32px 16px}h1{font-size:2rem}.news li{grid-template-columns:1fr;gap:2px}}
+      @media print{:root{--bg:#fff;--card:#fff;--soft:#f3f4f6;--text:#000;--muted:#444;--line:#ccc;--accent:#1d3fa0}.wrap{padding:0}section{break-inside:avoid}}
+      </style></head><body><div class="wrap">
+
+      <header>
+      <p class="eyebrow">Company one-pager</p>
+      <h1>COMPANY</h1>
+      <p class="summary">ONE-SENTENCE SUMMARY</p>
+      <a href="WEBSITE URL">DOMAIN ↗</a>
+      </header>
+
+      <section class="lead"><h2>What they do</h2>
+      <p>WHAT THEY DO, 2–3 SENTENCES</p>
+      </section>
+
+      <section><h2>Key facts</h2>
+      <div class="facts">
+      <!-- Exactly six tiles in this order: Founded, Headquarters, Employees, Revenue, Ownership, CEO -->
+      <div class="fact"><div class="k">Founded</div><div class="v">SHORT VALUE<small>OPTIONAL DETAIL WITH <a href="URL">source</a></small></div></div>
+      <!-- A value that is "not public": --><div class="fact na"><div class="k">Headquarters</div><div class="v">Not public</div></div>
+      </div>
+      </section>
+
+      <div class="two two-wrap">
+      <section><h2>Products and services</h2><ul>
+      <li><strong>NAME:</strong> DESCRIPTION</li>
+      </ul></section>
+      <section><h2>Customers and market</h2>
+      <p>PARAGRAPH</p>
+      </section>
+      </div>
+
+      <section><h2>Recent news</h2>
+      <ul class="news">
+      <li><time datetime="YYYY-MM-DD">D Mon YYYY</time><span>NEWS ITEM. <a href="URL">Publisher</a></span></li>
+      </ul>
+      <!-- or, when there is none: <p class="empty">No recent business news found.</p> -->
+      </section>
+
+      <footer><h2>Sources</h2>
+      <h3>Company</h3><ul>
+      <li>Publisher, <a href="URL">title</a>, accessed YYYY-MM-DD</li>
+      </ul>
+      <h3>Independent</h3><ul>
+      <li>Publisher, <a href="URL">title</a>, accessed YYYY-MM-DD</li>
+      <!-- or: <li>No independent coverage found.</li> -->
+      </ul>
+      <p class="gen">Generated with Aixle Flow · Hello Flow · YYYY-MM-DD</p>
+      </footer>
+
+      </div></body></html>
+      ```
+
+      **Filling rules.**
+      - Key facts: each `.v` holds the short answer only (a year, a city, a number with its fiscal year, "Public (Nasdaq: NVDA)", a name), at most about 6 words. Everything else from the brief goes into the tile's `<small>`, at most about 25 words, with its source link. A "not public" fact uses the `fact na` tile with the text "Not public" and no `<small>`.
+      - Products and services: one `<li>` per brief bullet, the product or line name in `<strong>`. When the brief gives a description, write `<strong>Name:</strong> description`. When it gives only the name, write `<strong>Name</strong>` with no colon, followed by its source link if there is one.
+      - Recent news: newest first, as in the brief.
+      - Facts only: if the brief contains any remark about how the research went (pages that did not open, what was or was not verified, "per the dateline", "no independent report was opened"), leave it out of the page.
+      - Use only the facts in the brief; you may shorten for the tiles but never add, change or reinterpret a fact. Keep every source link.
+
+      **Steps.**
+      1. Read the brief and fill the template. Write `/workspace/outputs/<slug>-one-pager.html`.
+      2. Check the file: the `<style>` block is identical to the template, there are exactly six fact tiles, no `<strong>` ends with a colon that has nothing after it, and no placeholder text in capitals (COMPANY, URL, YYYY…) is left.
+      3. Promote the file to the project's Assets with `promote_asset`, name `<slug>-one-pager.html`.
+      4. Attach `/workspace/outputs/<slug>-one-pager.html` to the card with `board_attach_asset`.
+      5. Add a comment with `board_add_comment`: "✅ One-pager on <Company> is ready: it's attached to this card and saved in Assets as <slug>-one-pager.html."
+      6. Move the card to **Done** with `board_move_task`.
+      7. Call `finish_session` with exactly this note (fill in the company name, card number and file name): "Your one-pager on <Company> is ready. It's attached to card #<N> in Done and saved in **Assets** as `<slug>-one-pager.html`."
+
+      **If `promote_asset` or a board tool fails**, still finish: say in the note what did not happen and that the file is in this run's outputs.
+    agent: one_pager_designer
+    tools:
+    - promote_asset
+    - board_attach_asset
+    - board_move_task
+    - board_add_comment
+    depends_on:
+    - research_the_company
+    on_failure: fail
+    skip_policy: never
+    max_retries: 0
+    allow_non_interactive: true
+    bmad_enabled: false
+    input_asset_specs:
+    - name: company-brief.md
+      required: true
+      asset_type: document
+    output_asset_specs:
+    - name: "*-one-pager.html"
+      min_size: 2000
+      required: true
+      asset_type: document
+triggers:
+- kind: column
+  workflow: hello_flow
+  column: researching
+  trigger_mode: auto
+  cooldown_seconds: 5
